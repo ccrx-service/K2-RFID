@@ -232,4 +232,12 @@
     <string name="settings_host_address">主机地址</string>
     <string name="settings_port">端口</string>
     <string name="default_hex_color">#000000</string>
+    <string name="write_wait_title">写入标签</string>
+    <string name="write_wait_msg">正在等待识别标签。\n\n请将手机靠近标签，识别后将自动写入。</string>
+    <string name="writing_title">正在写入…</string>
+    <string name="writing_msg">正在写入并校验，请保持手机贴近标签。</string>
+    <string name="write_failed_title">写入失败</string>
+    <string name="write_verify_failed">校验失败：回读数据与写入内容不一致。</string>
+    <string name="write_tag_lost">标签连接中断，请保持手机贴近标签后重试。</string>
+    <string name="retry">重试</string>
 </resources>

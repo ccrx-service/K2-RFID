@@ -231,4 +231,12 @@
     <string name="settings_host_address">Host Address</string>
     <string name="settings_port">Port</string>
     <string name="default_hex_color">#000000</string>
+    <string name="write_wait_title">Write to Tag</string>
+    <string name="write_wait_msg">Waiting for a tag.\n\nHold your phone against the tag. It will be written automatically.</string>
+    <string name="writing_title">Writing…</string>
+    <string name="writing_msg">Writing and verifying. Keep your phone on the tag.</string>
+    <string name="write_failed_title">Write Failed</string>
+    <string name="write_verify_failed">Verification failed: the data read back does not match.</string>
+    <string name="write_tag_lost">Tag lost. Keep your phone on the tag and try again.</string>
+    <string name="retry">Retry</string>
 </resources>
