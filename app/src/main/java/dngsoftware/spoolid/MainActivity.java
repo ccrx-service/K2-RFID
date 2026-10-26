@@ -464,10 +464,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             }
         } catch (Exception ignored) {}
         final int state, error;
-        synchronized (writeLock) { state = writeState; error = pendingWriteErrorRes; }
-        if (state == WRITE_WAITING) showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, writeGeneration);
-        else if (state == WRITE_RUNNING) showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0, writeGeneration);
-        else if (error != 0) showWriteDialog(R.string.write_failed_title, getString(error), false, error, writeGeneration);
+        final long generation;
+        synchronized (writeLock) {
+            state = writeState;
+            error = pendingWriteErrorRes;
+            generation = writeGeneration;
+        }
+        if (state == WRITE_WAITING) showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
+        else if (state == WRITE_RUNNING) showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0, generation);
+        else if (error != 0) showWriteDialog(R.string.write_failed_title, getString(error), false, error, generation);
     }
 
     @Override
@@ -792,7 +797,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 cancelled = true;
             }
         }
-        if (cancelled) dismissWriteDialog(generation);
+        if (cancelled) {
+            // All current call sites are AlertDialog listeners on the main thread.
+            // Dismiss synchronously so generation checks cannot discard this user action.
+            try {
+                if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss();
+            } catch (Exception ignored) {}
+            writeDialog = null;
+        }
     }
 
     private void dismissWriteDialog(long generation) {
@@ -890,7 +902,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 if (error == 0) {
                     playBeep();
                     mainHandler.post(() -> {
-                        if (generation != writeGeneration || !isInForeground || isFinishing() || isDestroyed()) return;
+                        synchronized (writeLock) {
+                            if (generation != writeGeneration) return;
+                        }
+                        if (!isInForeground || isFinishing() || isDestroyed()) return;
                         main.tagid.setText(format("\uD83D\uDD10 %s", bytesToHex(tag.getId())));
                     });
                     dismissWriteDialog(generation);
