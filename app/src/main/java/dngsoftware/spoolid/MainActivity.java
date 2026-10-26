@@ -134,6 +134,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private Activity activity;
     Bitmap gradientBitmap;
     private ExecutorService executorService;
+    // NFC tag write state is protected by writeLock; generation invalidates stale UI callbacks.
+    private static final int WRITE_IDLE = 0, WRITE_WAITING = 1, WRITE_RUNNING = 2;
+    private final Object writeLock = new Object();
+    private int writeState = WRITE_IDLE;
+    private String pendingTagData;
+    private int pendingWriteErrorRes;
+    private long writeGeneration;
+    private volatile boolean isInForeground;
+    private AlertDialog writeDialog;
     private Handler mainHandler;
     private ActivityResultLauncher<Intent> exportDirectoryChooser;
     private ActivityResultLauncher<Intent> importFileChooser;
@@ -445,6 +454,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     @Override
     protected void onResume() {
         super.onResume();
+        isInForeground = true;
         try {
             nfcAdapter = NfcAdapter.getDefaultAdapter(context);
             if (nfcAdapter != null && nfcAdapter.isEnabled()) {
@@ -452,18 +462,32 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
                 nfcAdapter.enableReaderMode(activity, this, NfcAdapter.FLAG_READER_NFC_A, options);
             }
-        }catch (Exception ignored) {}
+        } catch (Exception ignored) {}
+        final int state, error;
+        synchronized (writeLock) { state = writeState; error = pendingWriteErrorRes; }
+        if (state == WRITE_WAITING) showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, writeGeneration);
+        else if (state == WRITE_RUNNING) showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0, writeGeneration);
+        else if (error != 0) showWriteDialog(R.string.write_failed_title, getString(error), false, error, writeGeneration);
     }
 
     @Override
     protected void onPause() {
-        super.onPause();
-        cancelPendingWrite(); // NFC reader mode is off in the background; a running write is not interrupted
-        try {
-            if (nfcAdapter != null) {
-                nfcAdapter.disableReaderMode(this);
+        isInForeground = false;
+        synchronized (writeLock) {
+            // Only a wait-for-tag operation is cancellable. A physical NFC transaction must finish.
+            if (writeState == WRITE_WAITING) {
+                writeState = WRITE_IDLE;
+                pendingTagData = null;
+                pendingWriteErrorRes = 0;
+                writeGeneration++;
             }
-        } catch (Exception ignored) {}
+        }
+        // onPause runs on the UI thread; dismiss synchronously so an old queued callback
+        // cannot close a newer dialog after the activity resumes.
+        try { if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss(); } catch (Exception ignored) {}
+        writeDialog = null;
+        super.onPause();
+        try { if (nfcAdapter != null) nfcAdapter.disableReaderMode(this); } catch (Exception ignored) {}
     }
 
     @Override
@@ -499,11 +523,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     @Override
     protected void onDestroy() {
+        isInForeground = false;
+        synchronized (writeLock) { writeGeneration++; }
+        try { if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss(); } catch (Exception ignored) {}
         super.onDestroy();
-        try {
-            if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss();
-        } catch (Exception ignored) {
-        }
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdownNow();
         }
@@ -735,73 +758,78 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         return null;
     }
 
-    // ---- Tap-to-write flow: press Write -> wait for a tag -> write -> read back and verify ----
-    private static final int WRITE_IDLE = 0, WRITE_WAITING = 1, WRITE_RUNNING = 2;
-    private final Object writeLock = new Object();
-    private int writeState = WRITE_IDLE;   // guarded by writeLock
-    private String pendingTagData = null;  // snapshot taken when Write was pressed, guarded by writeLock
-    private AlertDialog writeDialog;
+    void WriteTag(String tagData) { startTagWrite(tagData); }
 
-    /** Entry point for every write button: snapshots the data and waits for the next tag discovery. */
     void startTagWrite(String tagData) {
         if (nfcAdapter == null || !nfcAdapter.isEnabled()) {
             showToast(R.string.please_activate_nfc, Toast.LENGTH_SHORT);
             return;
         }
+        if (tagData == null || tagData.isEmpty()) return;
+        final long generation;
         synchronized (writeLock) {
-            if (writeState == WRITE_RUNNING) return;
+            if (writeState != WRITE_IDLE || pendingWriteErrorRes != 0 || pendingTagData != null) return;
             writeState = WRITE_WAITING;
-            pendingTagData = tagData;
+            pendingTagData = tagData; // immutable snapshot of the data at button press
+            generation = ++writeGeneration;
         }
-        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0);
+        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
     }
 
-    /** Cancels a pending write. Does nothing once the physical write has started. */
-    void cancelPendingWrite() {
+    private void cancelPendingWrite(long generation) {
+        boolean cancelled = false;
         synchronized (writeLock) {
-            if (writeState == WRITE_WAITING) {
+            if (generation == writeGeneration && writeState == WRITE_WAITING) {
                 writeState = WRITE_IDLE;
                 pendingTagData = null;
+                pendingWriteErrorRes = 0;
+                writeGeneration++;
+                cancelled = true;
+            } else if (generation == writeGeneration && writeState == WRITE_IDLE && pendingWriteErrorRes != 0) {
+                pendingTagData = null;
+                pendingWriteErrorRes = 0;
+                writeGeneration++;
+                cancelled = true;
             }
         }
-        dismissWriteDialog();
+        if (cancelled) dismissWriteDialog(generation);
     }
 
-    private void dismissWriteDialog() {
+    private void dismissWriteDialog(long generation) {
         mainHandler.post(() -> {
-            try {
-                if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss();
-            } catch (Exception ignored) {
+            synchronized (writeLock) {
+                if (generation >= 0 && generation != writeGeneration) return;
             }
+            try { if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss(); } catch (Exception ignored) {}
             writeDialog = null;
         });
     }
 
-    /**
-     * Shows the write status dialog. running = no buttons, cannot be dismissed.
-     * failure (errorRes != 0) = Retry / Close; otherwise waiting = Cancel.
-     */
-    private void showWriteDialog(int titleRes, String message, boolean running, int errorRes) {
+    private void showWriteDialog(int titleRes, String message, boolean running, int errorRes, long generation) {
         mainHandler.post(() -> {
+            synchronized (writeLock) {
+                if (generation != writeGeneration) return;
+                if (running && writeState != WRITE_RUNNING) return;
+                if (!running && errorRes == 0 && writeState != WRITE_WAITING) return;
+                if (!running && errorRes != 0 && (writeState != WRITE_IDLE || pendingWriteErrorRes != errorRes)) return;
+            }
+            if (!isInForeground || isFinishing() || isDestroyed()) return;
             try {
-                if (isFinishing() || isDestroyed()) return;
                 if (writeDialog != null && writeDialog.isShowing()) writeDialog.dismiss();
                 AlertDialog.Builder builder = new AlertDialog.Builder(context);
                 SpannableString titleText = new SpannableString(getString(titleRes));
                 titleText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.primary_brand)), 0, titleText.length(), 0);
                 SpannableString messageText = new SpannableString(message);
                 messageText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.text_main)), 0, messageText.length(), 0);
-                builder.setTitle(titleText);
-                builder.setMessage(messageText);
-                builder.setCancelable(!running);
+                builder.setTitle(titleText).setMessage(messageText).setCancelable(!running);
                 if (!running) {
                     if (errorRes != 0) {
-                        builder.setPositiveButton(R.string.retry, (d, w) -> retryTagWrite());
-                        builder.setNegativeButton(R.string.close, (d, w) -> cancelPendingWrite());
+                        builder.setPositiveButton(R.string.retry, (d, w) -> retryTagWrite(generation));
+                        builder.setNegativeButton(R.string.close, (d, w) -> cancelPendingWrite(generation));
                     } else {
-                        builder.setNegativeButton(R.string.cancel, (d, w) -> cancelPendingWrite());
+                        builder.setNegativeButton(R.string.cancel, (d, w) -> cancelPendingWrite(generation));
                     }
-                    builder.setOnCancelListener(d -> cancelPendingWrite());
+                    builder.setOnCancelListener(d -> cancelPendingWrite(generation));
                 }
                 AlertDialog alert = builder.create();
                 alert.setCanceledOnTouchOutside(false);
@@ -809,83 +837,99 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 alert.show();
                 if (alert.getWindow() != null) {
                     alert.getWindow().setBackgroundDrawableResource(R.color.background_alt);
-                    if (alert.getButton(AlertDialog.BUTTON_POSITIVE) != null)
-                        alert.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
-                    if (alert.getButton(AlertDialog.BUTTON_NEGATIVE) != null)
-                        alert.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
+                    if (alert.getButton(AlertDialog.BUTTON_POSITIVE) != null) alert.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
+                    if (alert.getButton(AlertDialog.BUTTON_NEGATIVE) != null) alert.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         });
     }
 
-    /** Failure dialog "Retry": keeps the same data and waits for the next tag touch. */
-    private void retryTagWrite() {
+    private void retryTagWrite(long oldGeneration) {
+        final long generation;
         synchronized (writeLock) {
-            if (writeState == WRITE_RUNNING || pendingTagData == null) return;
+            if (oldGeneration != writeGeneration || writeState != WRITE_IDLE || pendingTagData == null || pendingWriteErrorRes == 0) return;
+            pendingWriteErrorRes = 0;
             writeState = WRITE_WAITING;
+            generation = ++writeGeneration;
         }
-        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0);
+        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
     }
 
-    /** Called from onTagDiscovered. Returns true when a pending write took ownership of this tag. */
     boolean handleTagForWrite(Tag tag) {
         final String data;
+        final long generation;
         synchronized (writeLock) {
-            if (writeState != WRITE_WAITING || pendingTagData == null) return false;
-            writeState = WRITE_RUNNING; // one-shot: later discoveries of the same tag cannot start a second write
+            if (writeState == WRITE_RUNNING || pendingWriteErrorRes != 0) return true; // never fall through to auto-read
+            if (writeState == WRITE_IDLE) return false;
+            if (pendingTagData == null || pendingTagData.isEmpty() || !isInForeground) {
+                writeState = WRITE_IDLE;
+                pendingTagData = null;
+                pendingWriteErrorRes = 0;
+                writeGeneration++;
+                return true; // fail closed; do not treat this discovery as a normal read
+            }
+            writeState = WRITE_RUNNING;
             data = pendingTagData;
+            generation = writeGeneration;
         }
         currentTag = tag;
-        showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0);
-        executorService.execute(() -> {
-            int error = writeAndVerify(tag, data);
-            if (error == 0) {
+        showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0, generation);
+        try {
+            executorService.execute(() -> {
+                int error = writeAndVerify(tag, data);
                 synchronized (writeLock) {
+                    if (generation != writeGeneration || writeState != WRITE_RUNNING) return;
                     writeState = WRITE_IDLE;
-                    pendingTagData = null;
+                    if (error == 0) {
+                        pendingTagData = null;
+                        pendingWriteErrorRes = 0;
+                    } else {
+                        pendingWriteErrorRes = error;
+                    }
                 }
-                playBeep();
-                mainHandler.post(() -> main.tagid.setText(format("\uD83D\uDD10 %s", bytesToHex(tag.getId()))));
-                dismissWriteDialog();
-                showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
-            } else {
-                synchronized (writeLock) {
-                    writeState = WRITE_IDLE; // pendingTagData is kept for Retry
+                if (error == 0) {
+                    playBeep();
+                    mainHandler.post(() -> {
+                        if (generation != writeGeneration || !isInForeground || isFinishing() || isDestroyed()) return;
+                        main.tagid.setText(format("\uD83D\uDD10 %s", bytesToHex(tag.getId())));
+                    });
+                    dismissWriteDialog(generation);
+                    if (isInForeground) showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                } else if (isInForeground) {
+                    showWriteDialog(R.string.write_failed_title, getString(error), false, error, generation);
                 }
-                showWriteDialog(R.string.write_failed_title, getString(error), false, error);
+            });
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            synchronized (writeLock) {
+                if (generation == writeGeneration && writeState == WRITE_RUNNING) {
+                    writeState = WRITE_IDLE;
+                    pendingWriteErrorRes = R.string.error_writing_to_tag;
+                }
             }
-        });
+            if (isInForeground) showWriteDialog(R.string.write_failed_title, getString(R.string.error_writing_to_tag), false, R.string.error_writing_to_tag, generation);
+        }
         return true;
     }
 
-    /** Result is 0 on success, otherwise the string resource describing the failure. Runs on a worker thread. */
     private int writeAndVerify(Tag tag, String tagData) {
         if (tag.getId().length > 4) return R.string.tag_not_compatible;
         MifareClassic mfc = MifareClassic.get(tag);
         if (mfc == null || mfc.getType() != MifareClassic.TYPE_CLASSIC) return R.string.invalid_tag_type;
         try {
             byte[] key = createKey(tag.getId());
-            // Re-detect the key state of THIS tag (a previous failed attempt may have changed it).
             boolean isEnc;
             mfc.connect();
-            try {
-                isEnc = mfc.authenticateSectorWithKeyA(1, key);
-            } finally {
-                try { mfc.close(); } catch (Exception ignored) {}
-            }
+            try { isEnc = mfc.authenticateSectorWithKeyA(1, key); }
+            finally { try { mfc.close(); } catch (Exception ignored) {} }
             encKey = key;
             encrypted = isEnc;
-
             mfc.connect();
             String paddedData = String.format("%-96s", tagData);
             byte[] fullDataBytes = paddedData.getBytes(StandardCharsets.UTF_8);
             byte[] keyS1 = isEnc ? key : MifareClassic.KEY_DEFAULT;
             if (!mfc.authenticateSectorWithKeyA(1, keyS1)) return R.string.authentication_failed;
             byte[] s1ToDisk = cipherData(1, Arrays.copyOfRange(fullDataBytes, 0, 48));
-            for (int i = 0; i < 48; i += 16) {
-                mfc.writeBlock(4 + (i / 16), Arrays.copyOfRange(s1ToDisk, i, i + 16));
-            }
+            for (int i = 0; i < 48; i += 16) mfc.writeBlock(4 + (i / 16), Arrays.copyOfRange(s1ToDisk, i, i + 16));
             if (!isEnc) {
                 byte[] trailer = mfc.readBlock(7);
                 System.arraycopy(key, 0, trailer, 0, 6);
@@ -893,23 +937,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 mfc.writeBlock(7, trailer);
             }
             if (!mfc.authenticateSectorWithKeyA(2, MifareClassic.KEY_DEFAULT)) return R.string.authentication_failed;
-            byte[] s2ToDisk = Arrays.copyOfRange(fullDataBytes, 48, 96); // plain text
-            for (int i = 0; i < 48; i += 16) {
-                mfc.writeBlock(8 + (i / 16), Arrays.copyOfRange(s2ToDisk, i, i + 16));
-            }
-
-            // Read back with the key state the tag has now: sector 1 always uses the tag key after a write.
+            byte[] s2ToDisk = Arrays.copyOfRange(fullDataBytes, 48, 96);
+            for (int i = 0; i < 48; i += 16) mfc.writeBlock(8 + (i / 16), Arrays.copyOfRange(s2ToDisk, i, i + 16));
             if (!mfc.authenticateSectorWithKeyA(1, key)) return R.string.write_verify_failed;
             byte[] back1 = new byte[48];
-            for (int i = 0; i < 48; i += 16) {
-                System.arraycopy(mfc.readBlock(4 + (i / 16)), 0, back1, i, 16);
-            }
+            for (int i = 0; i < 48; i += 16) System.arraycopy(mfc.readBlock(4 + (i / 16)), 0, back1, i, 16);
             if (!Arrays.equals(back1, s1ToDisk)) return R.string.write_verify_failed;
             if (!mfc.authenticateSectorWithKeyA(2, MifareClassic.KEY_DEFAULT)) return R.string.write_verify_failed;
             byte[] back2 = new byte[48];
-            for (int i = 0; i < 48; i += 16) {
-                System.arraycopy(mfc.readBlock(8 + (i / 16)), 0, back2, i, 16);
-            }
+            for (int i = 0; i < 48; i += 16) System.arraycopy(mfc.readBlock(8 + (i / 16)), 0, back2, i, 16);
             if (!Arrays.equals(back2, s2ToDisk)) return R.string.write_verify_failed;
             encrypted = true;
             return 0;
@@ -917,9 +953,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             return R.string.write_tag_lost;
         } catch (Exception e) {
             return R.string.error_writing_to_tag;
-        } finally {
-            try { mfc.close(); } catch (Exception ignored) {}
-        }
+        } finally { try { mfc.close(); } catch (Exception ignored) {} }
     }
 
     void FormatTag() {
@@ -1078,7 +1112,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
         String reserve = "00000000000000";
         String batch = "A2";
-        startTagWrite("AB124" + vendorId + batch + filamentId + color + Length + serialNum + reserve + PrinterType);
+        WriteTag("AB124" + vendorId + batch + filamentId + color + Length + serialNum + reserve + PrinterType);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -1265,7 +1299,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         && Objects.requireNonNull(manual.txtvendor.getText()).length() == 4 && Objects.requireNonNull(manual.txtbatch.getText()).length() == 2 && Objects.requireNonNull(manual.txtmaterial.getText()).length() == 6
                         && Objects.requireNonNull(manual.txtcolor.getText()).length() == 7 && Objects.requireNonNull(manual.txtlength.getText()).length() == 4
                         && Objects.requireNonNull(manual.txtserial.getText()).length() == 6 && Objects.requireNonNull(manual.txtreserve.getText()).length() == 6) {
-                    startTagWrite(manual.txtmonth.getText().toString() + manual.txtday.getText().toString() + manual.txtyear.getText().toString()
+                    WriteTag(manual.txtmonth.getText().toString() + manual.txtday.getText().toString() + manual.txtyear.getText().toString()
                             + manual.txtvendor.getText().toString() + manual.txtbatch.getText().toString() + manual.txtmaterial.getText().toString() + manual.txtcolor.getText().toString()
                             + manual.txtlength.getText().toString() + manual.txtserial.getText().toString() + manual.txtreserve.getText().toString());
                     SaveSetting(context, "mon", manual.txtmonth.getText().toString().toUpperCase());
