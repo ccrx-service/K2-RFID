@@ -2118,7 +2118,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         input.setTextAlignment(TEXT_ALIGNMENT_CENTER);
         input.setText(rgbToHex(dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress()));
         InputFilter[] filters = new InputFilter[3];
-        filters[0] = new HexInputFilter();
+        filters[0] = new Utils.HexInputFilter();
         filters[1] = new InputFilter.LengthFilter(6);
         filters[2] = new InputFilter.AllCaps();
         input.setFilters(filters);
