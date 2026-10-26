@@ -60,7 +60,7 @@
 2. **功能边界**：本工具的核心功能仅为**向用户自行拥有的空白/可写 NFC 标签（如 M1 白卡）写入符合特定格式的数据**。本项目**不包含、不提供、也不涉及**任何修改打印机固件、破解系统验证、绕过技术保护措施或非法控制计算机信息系统的功能。
 3. **合规使用**：请仅在遵守当地法律法规的前提下，将本工具用于个人合法拥有的耗材与设备的兼容性管理。严禁将本工具用于任何商业侵权、恶意破坏或非法目的。
 4. **风险自担**：使用本工具修改标签数据可能导致打印机官方保修失效、耗材数据异常或不可预见的硬件交互问题。使用者需自行承担因使用本工具而产生的全部风险与后果，开发者不对任何直接或间接损失负责。
-5. **开源协议**：本项目遵循上游原项目（DnG-Crafts/K2-RFID）的开源协议（**[在此处核实并填入具体协议，如 GPL-3.0]**）。您可以自由分发和修改，但必须保留原作者信息并遵循相同的开源协议。
+5. **开源协议**：本项目遵循上游原项目（DnG-Crafts/K2-RFID）的开源协议（GPL-3.0）。您可以自由分发和修改，但必须保留原作者信息并遵循相同的开源协议。
 
 **English Disclaimer:**
 
@@ -68,7 +68,7 @@
 2. **Functional Boundary**: The core function of this tool is solely to **write formatted data to blank/writable NFC tags (e.g., M1 cards) owned by the user**. This project **does NOT** contain, provide, or involve any functionality to modify printer firmware, crack system verification, bypass technical protection measures, or illegally control computer information systems.
 3. **Compliant Use**: Please use this tool only for compatibility management of your legally owned consumables and devices, in compliance with local laws and regulations. Commercial infringement, malicious damage, or illegal use is strictly prohibited.
 4. **Use at Your Own Risk**: Modifying tag data using this tool may void the official warranty, cause consumable data anomalies, or lead to unforeseen hardware interaction issues. Users assume all risks and consequences arising from the use of this tool. The developers are not liable for any direct or indirect damages.
-5. **Open Source License**: This project complies with the open-source license of the upstream original project (DnG-Crafts/K2-RFID) (**[Verify and insert license, e.g., GPL-3.0]**). You are free to distribute and modify it, provided you retain the original author's credits and adhere to the same open-source license.
+5. **Open Source License**: This project complies with the open-source license of the upstream original project (DnG-Crafts/K2-RFID) (GPL-3.0]). You are free to distribute and modify it, provided you retain the original author's credits and adhere to the same open-source license.
 
 
 ### 🛠️ 自行编译
