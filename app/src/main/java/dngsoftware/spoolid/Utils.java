@@ -60,6 +60,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 
 @SuppressLint("GetInstance")
@@ -591,95 +593,201 @@ public class Utils {
     }
 
     public static String getJsonDB(String psw, String host, String pType, String fileName) {
+        if (!"material_database.json".equals(fileName) && !"material_option.json".equals(fileName)) {
+            return null;
+        }
+
+        String remoteDir = pType.toLowerCase(Locale.ROOT).contains("k1")
+                ? "/usr/data/creality/userdata/box/"
+                : "/mnt/UDISK/creality/userdata/box/";
+
+        Session session = null;
+        ChannelExec channel = null;
         try {
             JSch jsch = new JSch();
-            Session session = jsch.getSession("root", host, 22);
+            session = jsch.getSession("root", host, 22);
             session.setPassword(psw);
             Properties prop = new Properties();
             prop.put("StrictHostKeyChecking", "no");
             session.setConfig(prop);
-            session.connect();
-            ChannelExec channel = (ChannelExec) session.openChannel("exec");
+            session.setTimeout(15000);
+            session.connect(5000);
+
+            channel = (ChannelExec) session.openChannel("exec");
             InputStream in = channel.getInputStream();
             OutputStream out = channel.getOutputStream();
-            if (pType.toLowerCase().contains("k1")) {
-                channel.setCommand("scp -f /usr/data/creality/userdata/box/" + fileName);
-            } else {
-                channel.setCommand("scp -f /mnt/UDISK/creality/userdata/box/" + fileName);
-            }
+            channel.setCommand("scp -f " + remoteDir + fileName);
             channel.connect(5000);
-            StringBuilder jsonDb = new StringBuilder();
-            byte[] buf = new byte[1024];
-            buf[0] = 0;
-            out.write(buf, 0, 1);
+
+            out.write(0);
             out.flush();
+
+            int c = in.read();
+            if (c == -1) throw new IOException("Connection closed");
+            if (c == 1 || c == 2) throw new IOException("Remote error: " + readScpError(in));
+            if (c != 'C') throw new IOException("Invalid header");
+
+            StringBuilder header = new StringBuilder(64);
+            header.append((char) c);
             while (true) {
-                try {
-                    long filesize;
-                    for (int i = 0; ; i++) {
-                        int ret = in.read(buf, i, 1);
-                        if (buf[i] == (byte) 0x0a) {
-                            String hdr = new String(buf, 0, i);
-                            filesize = Long.parseLong(hdr.split(" ")[1]);
-                            break;
-                        }
-                    }
-                    buf[0] = 0;
-                    out.write(buf, 0, 1);
-                    out.flush();
-                    int i;
-                    while (true) {
-                        if (buf.length < filesize)
-                            i = buf.length;
-                        else
-                            i = (int) filesize;
-                        i = in.read(buf, 0, i);
-                        if (i < 0) {
-                            break;
-                        }
-                        jsonDb.append(new String(buf, 0, i));
-                        filesize -= i;
-                        if (filesize == 0L)
-                            break;
-                    }
-                    buf[0] = 0;
-                    out.write(buf, 0, 1);
-                    out.flush();
-                }catch (Exception ignored){
-                    break;
-                }
+                int hc = in.read();
+                if (hc == -1) throw new IOException("EOF while reading header");
+                if (hc == '\n') break;
+                header.append((char) hc);
+                if (header.length() > 1024) throw new IOException("Header too long");
             }
-            channel.disconnect();
-            session.disconnect();
-            return jsonDb.toString();
-        } catch (Exception ignored) {
+
+            String[] parts = header.toString().split(" ");
+            if (parts.length < 3) throw new IOException("Invalid header format");
+
+            // 验证模式字段格式
+            if (!parts[0].matches("C[0-7]{4}")) {
+                throw new IOException("Invalid SCP file mode");
+            }
+            // 验证文件名
+            if (!fileName.equals(parts[2].trim())) {
+                throw new IOException("Filename mismatch: expected " + fileName + ", got " + parts[2]);
+            }
+
+            long fileSize = Long.parseLong(parts[1]);
+            if (fileSize < 0 || fileSize > 16 * 1024 * 1024) throw new IOException("Invalid file size");
+
+            out.write(0);
+            out.flush();
+
+            byte[] fileData = new byte[(int) fileSize];
+            int readBytes = 0;
+            while (readBytes < fileSize) {
+                int bytesRead = in.read(fileData, readBytes, (int) fileSize - readBytes);
+                if (bytesRead == -1) throw new IOException("Transfer interrupted");
+                readBytes += bytesRead;
+            }
+
+            int endAck = in.read();
+            if (endAck != 0) throw new IOException("Invalid end marker");
+
+            out.write(0);
+            out.flush();
+
+            return new String(fileData, StandardCharsets.UTF_8);
+
+        } catch (Exception e) {
+            android.util.Log.e("SCP_DEBUG", "Download failed", e);
             return null;
+        } finally {
+            if (channel != null) try { channel.disconnect(); } catch (Exception ignored) {}
+            if (session != null) try { session.disconnect(); } catch (Exception ignored) {}
+        }
+    }
+
+    private static void checkScpAck(InputStream in) throws IOException {
+        int b = in.read();
+        if (b == -1) throw new IOException("SCP read EOF");
+        if (b == 0) return;
+        throw new IOException("SCP error: " + readScpError(in));
+    }
+
+    private static String readScpError(InputStream in) throws IOException {
+        StringBuilder sb = new StringBuilder(64);
+        while (sb.length() < 1024) {
+            int c = in.read();
+            if (c == -1 || c == '\n') break;
+            sb.append((char) c);
+        }
+        return sb.toString();
+    }
+
+    private static void executeSshCommandWithStatus(Session session, String command) throws Exception {
+        ChannelExec channel = (ChannelExec) session.openChannel("exec");
+        InputStream err = channel.getErrStream();
+        try {
+            channel.setCommand(command);
+            channel.connect(5000);
+
+            long start = System.currentTimeMillis();
+            byte[] buf = new byte[1024];
+            StringBuilder errorLog = new StringBuilder();
+
+            while (!channel.isClosed()) {
+                if (System.currentTimeMillis() - start > 15000) {
+                    throw new Exception("Command execution timed out: " + command);
+                }
+                while (err.available() > 0) {
+                    int n = err.read(buf);
+                    if (n > 0) errorLog.append(new String(buf, 0, n, StandardCharsets.UTF_8));
+                }
+                Thread.sleep(50);
+            }
+
+            if (channel.getExitStatus() != 0) {
+                throw new Exception("Command failed (exit=" + channel.getExitStatus() + "). Stderr: " + errorLog.toString());
+            }
+        } finally {
+            if (channel.isConnected()) channel.disconnect();
         }
     }
 
     public static void setJsonDB(String dbData, String psw, String host, String pType, String fileName) throws Exception {
-        JSch jsch = new JSch();
-        Session session = jsch.getSession("root", host, 22);
-        session.setPassword(psw);
-        Properties prop = new Properties();
-        prop.put("StrictHostKeyChecking", "no");
-        session.setConfig(prop);
-        session.connect();
-        ChannelExec channel = (ChannelExec) session.openChannel("exec");
-        InputStream in = channel.getInputStream();
-        OutputStream out = channel.getOutputStream();
-        if (pType.toLowerCase().contains("k1")) {
-            channel.setCommand("scp -p -t /usr/data/creality/userdata/box/" + fileName);
-        } else {
-            channel.setCommand("scp -p -t /mnt/UDISK/creality/userdata/box/" + fileName);
+        if (!"material_database.json".equals(fileName) && !"material_option.json".equals(fileName)) {
+            throw new IllegalArgumentException("Invalid file name: " + fileName);
         }
-        channel.connect(5000);
-        out.write(("C0644 " + dbData.length() + " " + fileName + "\n").getBytes());
-        out.flush();
-        out.write(dbData.getBytes());
-        out.flush();
-        channel.disconnect();
-        session.disconnect();
+        if (dbData == null) {
+            throw new IllegalArgumentException("JSON data must not be null");
+        }
+
+        byte[] bytes = dbData.getBytes(StandardCharsets.UTF_8);
+        String tmpFileName = fileName + "." + UUID.randomUUID() + ".tmp";
+        String remoteDir = pType.toLowerCase(Locale.ROOT).contains("k1")
+                ? "/usr/data/creality/userdata/box/"
+                : "/mnt/UDISK/creality/userdata/box/";
+        String remoteTmpPath = remoteDir + tmpFileName;
+
+        Session session = null;
+        ChannelExec channel = null;
+        try {
+            JSch jsch = new JSch();
+            session = jsch.getSession("root", host, 22);
+            session.setPassword(psw);
+            Properties prop = new Properties();
+            prop.put("StrictHostKeyChecking", "no");
+            session.setConfig(prop);
+            session.setTimeout(15000);
+            session.connect(5000);
+
+            channel = (ChannelExec) session.openChannel("exec");
+            InputStream in = channel.getInputStream();
+            OutputStream out = channel.getOutputStream();
+            channel.setCommand("scp -p -t " + remoteTmpPath);
+            channel.connect(5000);
+
+            checkScpAck(in);
+
+            out.write(("C0644 " + bytes.length + " " + tmpFileName + "\n").getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            checkScpAck(in);
+
+            out.write(bytes);
+            out.write(0);
+            out.flush();
+            checkScpAck(in);
+
+            channel.disconnect();
+            channel = null;
+
+            // 替换正式文件
+            executeSshCommandWithStatus(session, "mv -f " + remoteTmpPath + " " + remoteDir + fileName);
+
+        } catch (Exception e) {
+            android.util.Log.e("SCP_DEBUG", "Upload failed", e);
+            if (channel != null) try { channel.disconnect(); } catch (Exception ignored) {}
+            if (session != null && session.isConnected()) {
+                try { executeSshCommandWithStatus(session, "rm -f " + remoteTmpPath); } catch (Exception ignored) {}
+            }
+            throw e;
+        } finally {
+            if (channel != null) try { channel.disconnect(); } catch (Exception ignored) {}
+            if (session != null) try { session.disconnect(); } catch (Exception ignored) {}
+        }
     }
 
     public static void restartApp(Context context) {
