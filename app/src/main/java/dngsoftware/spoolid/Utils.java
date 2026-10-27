@@ -1173,41 +1173,30 @@ public class Utils {
 
     public static int[] presetColors() {
         return new int[]{
-                Color.parseColor("#25C4DA"),
-                Color.parseColor("#0099A7"),
-                Color.parseColor("#0B359A"),
-                Color.parseColor("#0A4AB6"),
-                Color.parseColor("#11B6EE"),
-                Color.parseColor("#90C6F5"),
-                Color.parseColor("#FA7C0C"),
-                Color.parseColor("#F7B30F"),
-                Color.parseColor("#E5C20F"),
-                Color.parseColor("#B18F2E"),
-                Color.parseColor("#8D766D"),
-                Color.parseColor("#6C4E43"),
-                Color.parseColor("#E62E2E"),
-                Color.parseColor("#EE2862"),
-                Color.parseColor("#EA2A2B"),
-                Color.parseColor("#E83D89"),
-                Color.parseColor("#AE2E65"),
-                Color.parseColor("#611C8B"),
-                Color.parseColor("#8D60C7"),
-                Color.parseColor("#B287C9"),
-                Color.parseColor("#006764"),
-                Color.parseColor("#018D80"),
-                Color.parseColor("#42B5AE"),
-                Color.parseColor("#1D822D"),
-                Color.parseColor("#54B351"),
-                Color.parseColor("#72E115"),
-                Color.parseColor("#474747"),
-                Color.parseColor("#668798"),
-                Color.parseColor("#B1BEC6"),
-                Color.parseColor("#58636E"),
-                Color.parseColor("#F8E911"),
-                Color.parseColor("#F6D311"),
-                Color.parseColor("#F2EFCE"),
-                Color.parseColor("#FFFFFF"),
-                Color.parseColor("#000000")
+                Color.WHITE,                 // 1. 白色 (提前)
+                Color.BLACK,                 // 2. 黑色 (提前)
+                Color.parseColor("#D9F2B3"), // 3. 浅黄绿
+                Color.parseColor("#F2857A"), // 4. 浅珊瑚红
+                Color.parseColor("#72B0F5"), // 5. 浅蓝
+                Color.parseColor("#83E384"), // 6. 亮黄绿
+                Color.parseColor("#F79C44"), // 7. 橙色
+                Color.parseColor("#FF0000"), // 8. 纯红
+                Color.parseColor("#C3E6E9"), // 9. 浅青色
+                Color.parseColor("#9E59D6"), // 10. 紫色
+                Color.parseColor("#1FE1E1"), // 11. 青色/天蓝
+                Color.parseColor("#4DDFD6"), // 12. 浅青蓝
+                Color.parseColor("#D6BFD6"), // 13. 淡粉色
+                Color.parseColor("#FFD24F"), // 14. 黄色
+                Color.parseColor("#2943E3"), // 15. 深蓝色
+                Color.parseColor("#91CAE3"), // 16. 浅灰蓝
+                Color.parseColor("#35A0F5"), // 17. 亮蓝
+                Color.parseColor("#14FF2B"), // 18. 亮绿色
+                Color.parseColor("#12F5B0"), // 19. 翠绿色
+                Color.parseColor("#F342E3"), // 20. 品红色
+                Color.parseColor("#D6FF16"), // 21. 荧光黄
+                Color.parseColor("#B0BCF5"), // 22. 浅蓝紫
+                Color.parseColor("#6362E9"), // 23. 蓝紫色
+                Color.parseColor("#D1B42E")  // 24. 暗黄色
         };
     }
 

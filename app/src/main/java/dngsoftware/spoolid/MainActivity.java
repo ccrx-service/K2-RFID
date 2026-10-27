@@ -1144,6 +1144,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             pickerDialog.setContentView(rv);
             gradientBitmap = null;
 
+            dl.btnClose.setOnClickListener(v -> pickerDialog.dismiss());
+
             dl.btncls.setOnClickListener(v -> {
                 MaterialColor = dl.txtcolor.getText().toString();
                 if (customDialog != null && customDialog.isShowing()) {
@@ -2089,30 +2091,50 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     private void setupPresetColors(PickerDialogBinding dl) {
         dl.presetColorGrid.removeAllViews();
-        for (int color : presetColors()) {
-            Button colorButton = new Button(context);
-            FlexboxLayout.LayoutParams params = new FlexboxLayout.LayoutParams(
-                    (int) getResources().getDimension(R.dimen.preset_circle_size),
-                    (int) getResources().getDimension(R.dimen.preset_circle_size)
-            );
-            params.setMargins(
-                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
-                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
-                    (int) getResources().getDimension(R.dimen.preset_circle_margin),
-                    (int) getResources().getDimension(R.dimen.preset_circle_margin)
-            );
-            colorButton.setLayoutParams(params);
-            GradientDrawable circleDrawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.circle_shape, null);
-            assert circleDrawable != null;
-            circleDrawable.setColor(color);
-            colorButton.setBackground(circleDrawable);
-            colorButton.setTag(color);
-            colorButton.setOnClickListener(v -> {
-                int selectedColor = (int) v.getTag();
-                setSlidersFromColor(dl, selectedColor);
-            });
-            dl.presetColorGrid.addView(colorButton);
-        }
+
+        dl.presetColorGrid.post(() -> {
+            int parentWidth = dl.presetColorGrid.getWidth();
+            if (parentWidth == 0) return;
+
+            // 1. 严格平分 4 份
+            int cellWidth = parentWidth / 4;
+
+            // 2. 圆直径占据格子的 65%
+            int circleSize = (int) (cellWidth * 0.65);
+
+            // 3. 水平居中边距
+            int horizontalMargin = (cellWidth - circleSize) / 2;
+
+            // 4. 垂直边距极度压缩：固定 2dp，避免行间距过大
+            int verticalMargin = (int) (2 * context.getResources().getDisplayMetrics().density);
+
+            for (int color : presetColors()) {
+                Button colorButton = new Button(context);
+
+                colorButton.setMinWidth(0);
+                colorButton.setMinHeight(0);
+                colorButton.setMinimumWidth(0);
+                colorButton.setMinimumHeight(0);
+
+                FlexboxLayout.LayoutParams params = new FlexboxLayout.LayoutParams(circleSize, circleSize);
+                // 分别设置：左、上、右、下
+                params.setMargins(horizontalMargin, verticalMargin, horizontalMargin, verticalMargin);
+                colorButton.setLayoutParams(params);
+
+                GradientDrawable circleDrawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.circle_shape, null);
+                assert circleDrawable != null;
+                circleDrawable.setColor(color);
+                colorButton.setBackground(circleDrawable);
+                colorButton.setTag(color);
+
+                colorButton.setOnClickListener(v -> {
+                    int selectedColor = (int) v.getTag();
+                    setSlidersFromColor(dl, selectedColor);
+                });
+
+                dl.presetColorGrid.addView(colorButton);
+            }
+        });
     }
 
     private void setSlidersFromColor(PickerDialogBinding dl, int rgbColor) {
@@ -2202,6 +2224,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         toggleIcon.setImageResource(isExpandedInitially ? R.drawable.ic_arrow_up : R.drawable.ic_arrow_down);
         header.setOnClickListener(v -> {
             if (content.getVisibility() == View.VISIBLE) {
+                // 如果当前是展开的，点击后关闭它（允许全部关闭）
                 content.setVisibility(View.GONE);
                 toggleIcon.setImageResource(R.drawable.ic_arrow_down);
                 if (header.getId() == dl.rgbSlidersHeader.getId()) {
@@ -2214,6 +2237,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     SaveSetting(context, "PHOTO_VIEW", false);
                 }
             } else {
+                // 在展开当前面板前，先强制关闭其他三个面板
+                collapseOtherSections(dl, content);
+
+                // 展开当前面板
                 content.setVisibility(View.VISIBLE);
                 toggleIcon.setImageResource(R.drawable.ic_arrow_up);
                 if (header.getId() == dl.rgbSlidersHeader.getId()) {
@@ -2225,11 +2252,38 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     }
                 } else if (header.getId() == dl.presetColorsHeader.getId()) {
                     SaveSetting(context, "PRESET_VIEW", true);
+                    // 【修复点】：如果因为初始不可见导致宽度为0没有生成色卡，在此处重新渲染
+                    if (dl.presetColorGrid.getChildCount() == 0) {
+                        setupPresetColors(dl);
+                    }
                 } else if (header.getId() == dl.photoColorHeader.getId()) {
                     SaveSetting(context, "PHOTO_VIEW", true);
                 }
             }
         });
+    }
+
+    private void collapseOtherSections(PickerDialogBinding dl, ViewGroup activeContent) {
+        if (activeContent != dl.presetColorsContent) {
+            dl.presetColorsContent.setVisibility(View.GONE);
+            dl.presetColorsToggleIcon.setImageResource(R.drawable.ic_arrow_down);
+            SaveSetting(context, "PRESET_VIEW", false);
+        }
+        if (activeContent != dl.photoColorContent) {
+            dl.photoColorContent.setVisibility(View.GONE);
+            dl.photoColorToggleIcon.setImageResource(R.drawable.ic_arrow_down);
+            SaveSetting(context, "PHOTO_VIEW", false);
+        }
+        if (activeContent != dl.gradientPickerContent) {
+            dl.gradientPickerContent.setVisibility(View.GONE);
+            dl.gradientPickerToggleIcon.setImageResource(R.drawable.ic_arrow_down);
+            SaveSetting(context, "PICKER_VIEW", false);
+        }
+        if (activeContent != dl.rgbSlidersContent) {
+            dl.rgbSlidersContent.setVisibility(View.GONE);
+            dl.rgbSlidersToggleIcon.setImageResource(R.drawable.ic_arrow_down);
+            SaveSetting(context, "RGB_VIEW", false);
+        }
     }
 
     private void setupActivityResultLaunchers() {
