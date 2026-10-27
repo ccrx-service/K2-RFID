@@ -1,302 +1,348 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_main"
-    android:fillViewport="true"
     android:fitsSystemWindows="true">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
+    <!-- 固定在屏幕顶部的打印机标题 -->
+    <TextView
+        android:id="@+id/txtprinter"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingStart="12dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="4dp"
+        android:textColor="@color/primary_brand"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintWidth_max="500dp" />
+
+    <!-- 中间内容独立滚动，标题和底部按钮固定 -->
+    <ScrollView
+        android:id="@+id/update_scroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/background_main"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="4dp"
+        app:layout_constraintBottom_toTopOf="@id/update_footer"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txtprinter"
+        app:layout_constraintWidth_max="500dp">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/background_main"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <TextView
+                android:id="@+id/txtcurver"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:textColor="@color/text_main"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/txtnewver"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:textColor="@color/text_main"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/txtcurver" />
+
+            <Spinner
+                android:id="@+id/type"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:spinnerMode="dialog"
+                app:backgroundTint="@color/text_main"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/txtnewver" />
+
+            <View
+                android:id="@+id/typeborder"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/border"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/txtnewver" />
+
+            <TextView
+                android:id="@+id/lbltype"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/hint_background"
+                android:includeFontPadding="false"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/printer"
+                android:textColor="@color/primary_brand"
+                android:textSize="12sp"
+                app:layout_constraintBottom_toTopOf="@+id/typeborder"
+                app:layout_constraintStart_toStartOf="@+id/typeborder"
+                app:layout_constraintTop_toTopOf="@+id/typeborder" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layout_address"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="250dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/k2_printer_ip"
+                android:textColorHint="@color/primary_brand"
+                app:boxBackgroundColor="@color/background_alt"
+                app:boxStrokeColor="@color/input_border_color"
+                app:expandedHintEnabled="false"
+                app:hintAnimationEnabled="false"
+                app:hintTextColor="@color/input_border_color"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/txtnewver">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/txtaddress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ems="8"
+                    android:inputType="textNoSuggestions"
+                    android:singleLine="true"
+                    android:textColor="@color/text_main" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layout_psw"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="250dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/password"
+                android:textColorHint="@color/primary_brand"
+                app:boxBackgroundColor="@color/background_alt"
+                app:boxStrokeColor="@color/input_border_color"
+                app:expandedHintEnabled="false"
+                app:hintAnimationEnabled="false"
+                app:hintTextColor="@color/input_border_color"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/layout_address">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/txtpsw"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ems="8"
+                    android:inputType="textNoSuggestions"
+                    android:singleLine="true"
+                    android:textColor="@color/text_main" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 打印机示例图缩小，避免占据过多纵向空间 -->
+            <FrameLayout
+                android:id="@+id/imgframe"
+                android:layout_width="280dp"
+                android:layout_height="320dp"
+                android:layout_marginTop="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/type">
+
+                <ImageView
+                    android:id="@+id/imgprinter"
+                    android:layout_width="match_parent"
+                    android:layout_height="280dp"
+                    android:layout_gravity="top|center_horizontal"
+                    android:importantForAccessibility="no"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/imgtext"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:background="#00FFFFFF"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:text="@string/update_information"
+                    android:textColor="@color/primary_brand"
+                    android:textSize="12sp" />
+            </FrameLayout>
+
+            <!-- 注意：给 updatedesc 增加底部约束，防止移走 Switch 后 ScrollView 内部高度塌陷 -->
+            <TextView
+                android:id="@+id/updatedesc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/update_desc_printer"
+                android:textColor="@color/text_main"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/layout_psw"
+                tools:ignore="TextSizeCheck" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </ScrollView>
+
+    <!-- 状态提示和操作按钮、开关固定在屏幕底部 -->
+    <LinearLayout
+        android:id="@+id/update_footer"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@color/background_main"
-        android:layout_gravity="center|fill_vertical"
-        android:maxWidth="500dp"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="0dp"
-        android:layout_marginEnd="0dp"
-        android:layout_marginBottom="0dp"
-        android:orientation="vertical">
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="6dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintWidth_max="500dp">
 
-        <TextView
-            android:id="@+id/txtprinter"
-            android:layout_width="wrap_content"
+        <!-- 【移入】保留自定义耗材开关 -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/chkpres"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="5dp"
-            android:layout_marginEnd="16dp"
-            android:textColor="@color/primary_brand"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/txtcurver"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="22dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/preserve_custom_filaments"
             android:textColor="@color/text_main"
             android:textSize="16sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/txtprinter" />
+            app:thumbTint="@color/switch_tint_selector" />
 
-        <TextView
-            android:id="@+id/txtnewver"
-            android:layout_width="wrap_content"
+        <!-- 【移入】从打印机获取更新开关 -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/chkprnt"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="22dp"
-            android:layout_marginEnd="16dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/get_update_from_printer"
             android:textColor="@color/text_main"
             android:textSize="16sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/txtcurver" />
+            app:thumbTint="@color/switch_tint_selector" />
 
         <TextView
             android:id="@+id/txtmsg"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="21dp"
-            android:layout_marginEnd="16dp"
-            android:textColor="@color/text_main"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/updatedesc" />
-
-        <Spinner
-            android:id="@+id/type"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginTop="34dp"
-            android:layout_marginEnd="16dp"
-            android:spinnerMode="dialog"
-            app:backgroundTint="@color/text_main"
-            app:layout_constraintEnd_toEndOf="@+id/btnupd"
-            app:layout_constraintStart_toStartOf="@+id/btncls"
-            app:layout_constraintTop_toBottomOf="@+id/txtnewver"  />
-
-        <View
-            android:id="@+id/typeborder"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginTop="34dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/border"
-            app:layout_constraintEnd_toEndOf="@+id/btnupd"
-            app:layout_constraintStart_toStartOf="@+id/btncls"
-            app:layout_constraintTop_toBottomOf="@+id/txtnewver"   />
-
-        <TextView
-            android:id="@+id/lbltype"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:background="@drawable/hint_background"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
             android:includeFontPadding="false"
-            android:text="@string/printer"
-            android:textColor="@color/primary_brand"
-            android:textSize="12sp"
-            app:layout_constraintBottom_toTopOf="@+id/typeborder"
-            app:layout_constraintStart_toStartOf="@+id/typeborder"
-            app:layout_constraintTop_toTopOf="@+id/typeborder" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/layout_address"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="250dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:layout_marginHorizontal="16dp"
-            android:hint="@string/k2_printer_ip"
-            app:expandedHintEnabled="false"
-            app:hintAnimationEnabled="false"
-            app:boxBackgroundColor="@color/background_alt"
-            android:textColorHint="@color/primary_brand"
-            app:boxStrokeColor="@color/input_border_color"
-            app:hintTextColor="@color/input_border_color"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/txtnewver">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/txtaddress"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ems="8"
-                android:inputType="textNoSuggestions"
-                android:singleLine="true"
-                android:textColor="@color/text_main" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/layout_psw"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="250dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginHorizontal="16dp"
-            android:hint="@string/password"
-            app:expandedHintEnabled="false"
-            app:hintAnimationEnabled="false"
-            app:boxBackgroundColor="@color/background_alt"
-            android:textColorHint="@color/primary_brand"
-            app:boxStrokeColor="@color/input_border_color"
-            app:hintTextColor="@color/input_border_color"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/layout_address">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/txtpsw"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textNoSuggestions"
-                android:singleLine="true"
-                android:ems="8"
-                android:textColor="@color/text_main" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <Button
-            android:textColor="@color/text_inverted"
-            android:id="@+id/btnchk"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="40dp"
-            android:padding="14dp"
-            android:text="@string/check"
-            android:textSize="16sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/btncls"
-            app:layout_constraintTop_toBottomOf="@+id/chkprnt"
-            app:layout_constraintBottom_toBottomOf="parent"
-            tools:ignore="DuplicateClickableBoundsCheck,VisualLintOverlap" />
-
-        <Button
-            android:textColor="@color/text_inverted"
-            android:id="@+id/btnupd"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:padding="14dp"
-            android:text="@string/update"
-            android:textSize="16sp"
-            app:layout_constraintStart_toStartOf="@+id/btnchk"
-            app:layout_constraintTop_toTopOf="@+id/btnchk"
-            app:layout_constraintBottom_toBottomOf="@+id/btnchk"
-            app:layout_constraintEnd_toEndOf="@+id/btnchk" />
-
-        <Button
-            android:textColor="@color/text_inverted"
-            android:id="@+id/btncls"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="40dp"
-            android:layout_marginEnd="70dp"
-            android:layout_marginBottom="40dp"
-            android:padding="14dp"
-            android:text="@string/close"
-            android:textSize="16sp"
-            app:layout_constraintEnd_toStartOf="@+id/btnchk"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/chkprnt" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/chkpres"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/preserve_custom_filaments"
+            android:minHeight="20dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
             android:textColor="@color/text_main"
-            app:thumbTint="@color/switch_tint_selector"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/chkprnt"
-            app:layout_constraintEnd_toEndOf="@+id/imgframe"
-            app:layout_constraintStart_toStartOf="@+id/imgframe"
-            app:layout_constraintTop_toBottomOf="@+id/updatedesc" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/chkprnt"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/get_update_from_printer"
-            android:textColor="@color/text_main"
-            app:thumbTint="@color/switch_tint_selector"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/btnchk"
-            app:layout_constraintEnd_toEndOf="@+id/imgframe"
-            app:layout_constraintStart_toStartOf="@+id/imgframe"
-            app:layout_constraintTop_toBottomOf="@+id/chkpres" />
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/update_button_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        <FrameLayout
-            android:id="@+id/imgframe"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:layout_constraintEnd_toEndOf="@+id/btnupd"
-            app:layout_constraintStart_toStartOf="@+id/btncls"
-            app:layout_constraintTop_toBottomOf="@+id/type"
-            app:layout_constraintBottom_toBottomOf="@+id/updatedesc">
-            <ImageView
-                android:importantForAccessibility="no"
-                android:id="@+id/imgprinter"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginBottom="20dp"
-                android:scaleType="centerCrop" />
-            <TextView
-                android:id="@+id/imgtext"
-                android:layout_width="match_parent"
+            <Button
+                android:id="@+id/btncls"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
-                android:background="#00FFFFFF"
-                android:padding="8dp"
-                android:text="@string/update_information"
-                android:textColor="@color/primary_brand"
-                android:gravity="center"
-                android:textSize="16sp" />
-        </FrameLayout>
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="6dp"
+                android:paddingStart="12dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="10dp"
+                android:text="@string/close"
+                android:textColor="@color/text_inverted"
+                android:textSize="15sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:ignore="ButtonStyle" />
 
-        <TextView
-            android:id="@+id/updatedesc"
-            android:layout_width="320dp"
-            android:layout_height="180dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="32dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="40dp"
-            android:text="@string/update_desc_printer"
-            android:textColor="@color/text_main"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/chkpres"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/layout_psw"
-            tools:ignore="TextSizeCheck" />
+            <Button
+                android:id="@+id/btnchk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="6dp"
+                android:paddingStart="12dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="10dp"
+                android:text="@string/check"
+                android:textColor="@color/text_inverted"
+                android:textSize="15sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:ignore="ButtonStyle" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</ScrollView>
+            <Button
+                android:id="@+id/btnupd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="10dp"
+                android:text="@string/update"
+                android:textColor="@color/text_inverted"
+                android:textSize="15sp"
+                app:layout_constraintBottom_toBottomOf="@+id/btnchk"
+                app:layout_constraintEnd_toEndOf="@+id/btnchk"
+                app:layout_constraintStart_toStartOf="@+id/btnchk"
+                app:layout_constraintTop_toTopOf="@+id/btnchk"
+                tools:ignore="ButtonStyle" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
