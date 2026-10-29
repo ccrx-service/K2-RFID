@@ -241,4 +241,17 @@
     <string name="write_tag_lost">标签连接中断，请保持手机贴近标签后重试。</string>
     <string name="retry">重试</string>
     <string name="tag_weight_not_preset">标签中的重量不是当前提供的预设重量之一，未更改重量选择。</string>
+
+    <!-- NFC tag status and operation prompts -->
+    <string name="tag_status_data">有耗材数据</string>
+    <string name="tag_status_unformatted">未格式化</string>
+    <string name="tag_status_non_material">非耗材数据</string>
+    <string name="tag_status_unknown">无法判断标签数据</string>
+    <string name="read_wait_title">等待识别标签</string>
+    <string name="read_wait_msg">请将手机靠近需要读取的 NFC 标签，识别后将自动读取。</string>
+    <string name="reading_tag_msg">正在读取标签数据，请保持手机靠近标签。</string>
+    <string name="read_failed_wait_msg">读取失败，请重新碰触需要读取的标签，或取消操作。</string>
+    <string name="write_failed_wait_msg">写入操作未能完成，请重新碰触原标签，或取消操作。</string>
+    <string name="write_target_mismatch">这不是本次操作的目标标签，请重新碰触原标签或取消操作。</string>
+    <string name="operation_busy">另一项 NFC 操作正在进行，请先完成或取消。</string>
 </resources>

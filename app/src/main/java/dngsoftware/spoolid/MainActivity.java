@@ -139,6 +139,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private long writeGeneration;
     private volatile boolean isInForeground;
     private AlertDialog writeDialog;
+    private static final int READ_IDLE = 0, READ_WAITING = 1, READ_RUNNING = 2;
+    private final Object readLock = new Object();
+    private int readState = READ_IDLE;
+    private volatile long readGeneration;
+    private final java.util.concurrent.atomic.AtomicLong tagStatusGeneration = new java.util.concurrent.atomic.AtomicLong();
+    private AlertDialog readDialog;
+    private String pendingTargetTagId;
+    private enum TagDataStatus { UNKNOWN, UNFORMATTED, NON_MATERIAL, MATERIAL_DATA }
+    private volatile TagDataStatus tagDataStatus = TagDataStatus.UNKNOWN;
     private Handler mainHandler;
     private ActivityResultLauncher<Intent> exportDirectoryChooser;
     private ActivityResultLauncher<Intent> importFileChooser;
@@ -494,6 +503,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             if (writeState == WRITE_WAITING) {
                 writeState = WRITE_IDLE;
                 pendingTagData = null;
+                pendingTargetTagId = null;
                 pendingWriteErrorRes = 0;
                 writeGeneration++;
             }
@@ -603,25 +613,42 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     public void onTagDiscovered(Tag tag) {
         try {
             if (handleTagForWrite(tag)) return;
+            if (handleTagForRead(tag)) return;
             currentTag = tag;
-            mainHandler.post(() -> {
-                if (currentTag.getId().length > 4) {
+            final String id = bytesToHex(tag.getId());
+            if (tag.getId().length > 4) {
+                currentTag = null;
+                final long generation = tagStatusGeneration.incrementAndGet();
+                mainHandler.post(() -> {
+                    if (generation != tagStatusGeneration.get()) return;
+                    main.tagid.setTextColor(ContextCompat.getColor(context, R.color.primary_error));
+                    main.tagid.setText(id);
+                    setTagStatus(TagDataStatus.UNKNOWN);
                     showToast(R.string.tag_not_compatible, Toast.LENGTH_SHORT);
-                    main.tagid.setTextColor(ContextCompat.getColor(context,R.color.primary_error));
-                    main.tagid.setText(R.string.error);
-                    return;
-                }
-                showToast(getString(R.string.tag_found) + bytesToHex(currentTag.getId()), Toast.LENGTH_SHORT);
-                main.tagid.setTextColor(ContextCompat.getColor(context,R.color.text_main));
-                main.tagid.setText(bytesToHex(currentTag.getId()));
-                encKey = createKey(currentTag.getId());
-                CheckTag();
-                if (encrypted) {
-                    main.tagid.setText(format("\uD83D\uDD10 %s", bytesToHex(currentTag.getId())));
-                }
-                if (GetSetting(context, "autoread", false)) {
-                    ReadSpoolData();
-                }
+                });
+                return;
+            }
+            final long generation = tagStatusGeneration.incrementAndGet();
+            mainHandler.post(() -> {
+                if (generation != tagStatusGeneration.get()) return;
+                main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+                main.tagid.setText(id);
+                setTagStatus(TagDataStatus.UNKNOWN);
+                encKey = createKey(tag.getId());
+            });
+            executorService.execute(() -> {
+                String data = readTagDataForTag(tag);
+                TagDataStatus status = classifyTagData(data);
+                mainHandler.post(() -> {
+                    if (generation != tagStatusGeneration.get() || currentTag != tag) return;
+                    synchronized (readLock) {
+                        if (readState != READ_IDLE) return;
+                    }
+                    synchronized (writeLock) {
+                        if (writeState != WRITE_IDLE || pendingTagData != null) return;
+                    }
+                    setTagStatus(status);
+                });
             });
         } catch (Exception ignored) {
         }
@@ -782,14 +809,27 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             return;
         }
         if (tagData == null || tagData.isEmpty()) return;
+        synchronized (readLock) {
+            if (readState != READ_IDLE) {
+                showToast(R.string.operation_busy, Toast.LENGTH_SHORT);
+                return;
+            }
+        }
+        final Tag tag = currentTag;
         final long generation;
         synchronized (writeLock) {
             if (writeState != WRITE_IDLE || pendingWriteErrorRes != 0 || pendingTagData != null) return;
             writeState = WRITE_WAITING;
-            pendingTagData = tagData; // immutable snapshot of the data at button press
+            pendingTagData = tagData;
+            pendingTargetTagId = tag == null ? null : bytesToHex(tag.getId());
             generation = ++writeGeneration;
         }
-        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
+        tagStatusGeneration.incrementAndGet();
+        if (tag == null) {
+            showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
+        } else {
+            handleTagForWrite(tag);
+        }
     }
 
     private void cancelPendingWrite(long generation) {
@@ -798,11 +838,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             if (generation == writeGeneration && writeState == WRITE_WAITING) {
                 writeState = WRITE_IDLE;
                 pendingTagData = null;
+                pendingTargetTagId = null;
                 pendingWriteErrorRes = 0;
                 writeGeneration++;
                 cancelled = true;
             } else if (generation == writeGeneration && writeState == WRITE_IDLE && pendingWriteErrorRes != 0) {
                 pendingTagData = null;
+                pendingTargetTagId = null;
                 pendingWriteErrorRes = 0;
                 writeGeneration++;
                 cancelled = true;
@@ -881,46 +923,76 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     boolean handleTagForWrite(Tag tag) {
         final String data;
         final long generation;
+        boolean wrongTarget = false;
+        String candidateTagId = bytesToHex(tag.getId());
         synchronized (writeLock) {
-            if (writeState == WRITE_RUNNING || pendingWriteErrorRes != 0) return true; // never fall through to auto-read
+            if (writeState == WRITE_RUNNING || pendingWriteErrorRes != 0) return true;
             if (writeState == WRITE_IDLE) return false;
             if (pendingTagData == null || pendingTagData.isEmpty() || !isInForeground) {
                 writeState = WRITE_IDLE;
                 pendingTagData = null;
+                pendingTargetTagId = null;
                 pendingWriteErrorRes = 0;
                 writeGeneration++;
-                return true; // fail closed; do not treat this discovery as a normal read
+                return true;
             }
-            writeState = WRITE_RUNNING;
-            data = pendingTagData;
-            generation = writeGeneration;
+            if (pendingTargetTagId != null && !pendingTargetTagId.equals(candidateTagId)) {
+                wrongTarget = true;
+                data = null;
+                generation = writeGeneration;
+            } else {
+                if (pendingTargetTagId == null) pendingTargetTagId = candidateTagId;
+                writeState = WRITE_RUNNING;
+                data = pendingTagData;
+                generation = writeGeneration;
+            }
+        }
+        if (wrongTarget) {
+            mainHandler.post(() -> showToast(R.string.write_target_mismatch, Toast.LENGTH_LONG));
+            return true;
         }
         currentTag = tag;
+        mainHandler.post(() -> {
+            synchronized (writeLock) { if (generation != writeGeneration || writeState != WRITE_RUNNING) return; }
+            main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            main.tagid.setText(candidateTagId);
+            setTagStatus(TagDataStatus.UNKNOWN);
+        });
         showWriteDialog(R.string.writing_title, getString(R.string.writing_msg), true, 0, generation);
         try {
             executorService.execute(() -> {
                 int error = writeAndVerify(tag, data);
+                boolean waitAgain = error == R.string.write_tag_lost || error == R.string.error_writing_to_tag;
                 synchronized (writeLock) {
                     if (generation != writeGeneration || writeState != WRITE_RUNNING) return;
-                    writeState = WRITE_IDLE;
                     if (error == 0) {
+                        writeState = WRITE_IDLE;
                         pendingTagData = null;
+                        pendingTargetTagId = null;
+                        pendingWriteErrorRes = 0;
+                    } else if (waitAgain) {
+                        writeState = WRITE_WAITING;
                         pendingWriteErrorRes = 0;
                     } else {
+                        writeState = WRITE_IDLE;
                         pendingWriteErrorRes = error;
                     }
                 }
                 if (error == 0) {
+                    tagStatusGeneration.incrementAndGet();
                     playBeep();
                     mainHandler.post(() -> {
-                        synchronized (writeLock) {
-                            if (generation != writeGeneration) return;
-                        }
+                        synchronized (writeLock) { if (generation != writeGeneration) return; }
                         if (!isInForeground || isFinishing() || isDestroyed()) return;
-                        main.tagid.setText(format("\uD83D\uDD10 %s", bytesToHex(tag.getId())));
+                        main.tagid.setText(bytesToHex(tag.getId()));
+                        setTagStatus(TagDataStatus.MATERIAL_DATA);
                     });
                     dismissWriteDialog(generation);
                     if (isInForeground) showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                } else if (waitAgain && isInForeground) {
+                    currentTag = null;
+                    mainHandler.post(() -> setTagStatus(TagDataStatus.UNKNOWN));
+                    showWriteDialog(R.string.write_wait_title, getString(R.string.write_failed_wait_msg), false, 0, generation);
                 } else if (isInForeground) {
                     showWriteDialog(R.string.write_failed_title, getString(error), false, error, generation);
                 }
@@ -1050,14 +1122,275 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
     void ReadSpoolData() {
-        executorService.execute(() -> {
-            String tagData = ReadTag();
-            if (tagData != null && tagData.length() >= 40) {
-                mainHandler.post(() -> applyTagData(tagData));
-            } else {
-                showToast(R.string.error_reading_tag, Toast.LENGTH_SHORT);
+        synchronized (writeLock) {
+            if (writeState != WRITE_IDLE || pendingTagData != null) {
+                showToast(R.string.operation_busy, Toast.LENGTH_SHORT);
+                return;
             }
+        }
+        Tag tag = currentTag;
+        if (tag == null) {
+            beginReadWaiting(getString(R.string.read_wait_msg));
+            return;
+        }
+        final long generation;
+        synchronized (readLock) {
+            if (readState != READ_IDLE) return;
+            readState = READ_RUNNING;
+            generation = ++readGeneration;
+        }
+        tagStatusGeneration.incrementAndGet();
+        startReadAttempt(tag, generation);
+    }
+
+    private boolean handleTagForRead(Tag tag) {
+        final long generation;
+        synchronized (readLock) {
+            if (readState == READ_IDLE) return false;
+            if (readState == READ_RUNNING) return true;
+            readState = READ_RUNNING;
+            generation = readGeneration;
+        }
+        currentTag = tag;
+        final String id = bytesToHex(tag.getId());
+        mainHandler.post(() -> {
+            if (generation != readGeneration) return;
+            main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            main.tagid.setText(id);
+            setTagStatus(TagDataStatus.UNKNOWN);
+            showReadDialog(generation, getString(R.string.reading_tag_msg));
         });
+        startReadAttempt(tag, generation);
+        return true;
+    }
+
+    private void beginReadWaiting(String message) {
+        final long generation;
+        synchronized (readLock) {
+            if (readState != READ_IDLE) return;
+            readState = READ_WAITING;
+            generation = ++readGeneration;
+        }
+        currentTag = null;
+        tagStatusGeneration.incrementAndGet();
+        mainHandler.post(() -> {
+            main.tagid.setText(R.string._00_00_00_00);
+            main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            setTagStatus(TagDataStatus.UNKNOWN);
+        });
+        showReadDialog(generation, message);
+    }
+
+    private void startReadAttempt(Tag tag, long generation) {
+        try {
+            executorService.execute(() -> {
+                String data = readTagDataForTag(tag);
+                TagDataStatus status = classifyTagData(data);
+                mainHandler.post(() -> finishReadAttempt(tag, data, status, generation));
+            });
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            mainHandler.post(() -> continueReadWaiting(generation, getString(R.string.read_failed_wait_msg)));
+        }
+    }
+
+    private void finishReadAttempt(Tag tag, String data, TagDataStatus status, long generation) {
+        synchronized (readLock) {
+            if (generation != readGeneration || readState != READ_RUNNING) return;
+            if (data == null) {
+                readState = READ_WAITING;
+            } else {
+                readState = READ_IDLE;
+            }
+        }
+        if (data == null) {
+            currentTag = null;
+            tagStatusGeneration.incrementAndGet();
+            main.tagid.setText(R.string._00_00_00_00);
+            main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            setTagStatus(TagDataStatus.UNKNOWN);
+            showReadDialog(generation, getString(R.string.read_failed_wait_msg));
+            return;
+        }
+        currentTag = tag;
+        setTagStatus(status);
+        dismissReadDialog(generation);
+        if (status == TagDataStatus.MATERIAL_DATA) {
+            applyTagData(data);
+        } else if (status == TagDataStatus.UNFORMATTED) {
+            showToast(R.string.tag_status_unformatted, Toast.LENGTH_LONG);
+        } else {
+            showToast(R.string.tag_status_non_material, Toast.LENGTH_LONG);
+        }
+    }
+
+    private void continueReadWaiting(long generation, String message) {
+        synchronized (readLock) {
+            if (generation != readGeneration || readState == READ_IDLE) return;
+            readState = READ_WAITING;
+        }
+        currentTag = null;
+        tagStatusGeneration.incrementAndGet();
+        setTagStatus(TagDataStatus.UNKNOWN);
+        showReadDialog(generation, message);
+    }
+
+    private void showReadDialog(long generation, String message) {
+        mainHandler.post(() -> {
+            synchronized (readLock) {
+                if (generation != readGeneration || readState == READ_IDLE) return;
+            }
+            if (!isInForeground || isFinishing() || isDestroyed()) return;
+            try {
+                if (readDialog != null && readDialog.isShowing()) readDialog.dismiss();
+                SpannableString title = new SpannableString(getString(R.string.read_wait_title));
+                title.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.primary_brand)), 0, title.length(), 0);
+                SpannableString body = new SpannableString(message);
+                body.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.text_main)), 0, body.length(), 0);
+                AlertDialog.Builder builder = new AlertDialog.Builder(context)
+                        .setTitle(title).setMessage(body)
+                        .setNegativeButton(R.string.cancel, (d, w) -> cancelPendingRead(generation));
+                AlertDialog alert = builder.create();
+                alert.setCancelable(false);
+                alert.setCanceledOnTouchOutside(false);
+                alert.setOnCancelListener(d -> cancelPendingRead(generation));
+                readDialog = alert;
+                alert.show();
+                if (alert.getWindow() != null) {
+                    alert.getWindow().setBackgroundDrawableResource(R.color.background_alt);
+                    if (alert.getButton(AlertDialog.BUTTON_NEGATIVE) != null)
+                        alert.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
+                }
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private void dismissReadDialog(long generation) {
+        mainHandler.post(() -> {
+            synchronized (readLock) {
+                if (generation != readGeneration) return;
+            }
+            try { if (readDialog != null && readDialog.isShowing()) readDialog.dismiss(); } catch (Exception ignored) {}
+            readDialog = null;
+        });
+    }
+
+    private void cancelPendingRead(long generation) {
+        synchronized (readLock) {
+            if (generation != readGeneration || readState == READ_IDLE) return;
+            readState = READ_IDLE;
+            readGeneration++;
+        }
+        currentTag = null;
+        tagStatusGeneration.incrementAndGet();
+        main.tagid.setText(R.string._00_00_00_00);
+        main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+        try { if (readDialog != null && readDialog.isShowing()) readDialog.dismiss(); } catch (Exception ignored) {}
+        readDialog = null;
+        setTagStatus(TagDataStatus.UNKNOWN);
+    }
+
+    private String readTagDataForTag(Tag tag) {
+        if (tag == null || tag.getId().length > 4) return null;
+        MifareClassic mfc = MifareClassic.get(tag);
+        if (mfc == null || mfc.getType() != MifareClassic.TYPE_CLASSIC) return null;
+
+        byte[] key = createKey(tag.getId());
+        try {
+            mfc.connect();
+            boolean isEncrypted = mfc.authenticateSectorWithKeyA(1, key);
+            encKey = key;
+            encrypted = isEncrypted;
+
+            if (!isEncrypted && !mfc.authenticateSectorWithKeyA(1, MifareClassic.KEY_DEFAULT)) {
+                android.util.Log.w("K2-RFID-NFC", "Sector 1 authentication failed for tag " + bytesToHex(tag.getId()));
+                return null;
+            }
+
+            byte[] first = new byte[48];
+            byte[] second = new byte[48];
+            for (int i = 0; i < 3; i++) {
+                System.arraycopy(mfc.readBlock(4 + i), 0, first, i * 16, 16);
+            }
+
+            // Match the original ReadTag(): sector 2 is optional; if its default
+            // key does not authenticate, retain the zero-filled second segment
+            // rather than marking the entire tag read as failed.
+            if (mfc.authenticateSectorWithKeyA(2, MifareClassic.KEY_DEFAULT)) {
+                for (int i = 0; i < 3; i++) {
+                    System.arraycopy(mfc.readBlock(8 + i), 0, second, i * 16, 16);
+                }
+            } else {
+                android.util.Log.w("K2-RFID-NFC", "Sector 2 default-key authentication failed for tag " + bytesToHex(tag.getId()));
+            }
+
+            if (isEncrypted) first = cipherData(2, first);
+            return new String(first, StandardCharsets.UTF_8)
+                    + new String(second, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            android.util.Log.e("K2-RFID-NFC", "Failed to read NFC tag " + bytesToHex(tag.getId()), e);
+            return null;
+        } finally {
+            try { mfc.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    private TagDataStatus classifyTagData(String data) {
+        if (data == null) return TagDataStatus.UNKNOWN;
+        boolean allDefault = true;
+        for (int i = 0; i < data.length(); i++) {
+            char c = data.charAt(i);
+            if (c != 0 && c != 255 && c != 0xfffd && !Character.isWhitespace(c)) {
+                allDefault = false;
+                break;
+            }
+        }
+        if (allDefault) return TagDataStatus.UNFORMATTED;
+        if (data.length() >= 48 && data.startsWith("AB1240276") && data.charAt(11) == '1'
+                && data.substring(12, 17).matches("[0-9]{5}") && data.charAt(17) == '0'
+                && data.substring(18, 24).matches("(?i)[0-9a-f]{6}")
+                && data.substring(24, 28).matches("[0-9]{4}")) {
+            return TagDataStatus.MATERIAL_DATA;
+        }
+        return TagDataStatus.NON_MATERIAL;
+    }
+
+    private void setTagStatus(TagDataStatus status) {
+        if (status == null) status = TagDataStatus.UNKNOWN;
+        tagDataStatus = status;
+        int icon;
+        int description;
+        int idColor;
+        switch (status) {
+            case MATERIAL_DATA:
+                icon = R.drawable.ic_nfc_status_data_24;
+                description = R.string.tag_status_data;
+                idColor = R.color.nfc_status_data;
+                break;
+            case UNFORMATTED:
+                icon = R.drawable.ic_nfc_status_unformatted_24;
+                description = R.string.tag_status_unformatted;
+                idColor = R.color.nfc_status_unformatted;
+                break;
+            case NON_MATERIAL:
+                icon = R.drawable.ic_nfc_status_non_material_24;
+                description = R.string.tag_status_non_material;
+                idColor = R.color.nfc_status_non_material;
+                break;
+            default:
+                icon = R.drawable.ic_nfc_status_unknown_24;
+                description = R.string.tag_status_unknown;
+                idColor = R.color.nfc_status_unknown;
+                break;
+        }
+        if (main != null) {
+            if (main.tagid != null) {
+                main.tagid.setTextColor(ContextCompat.getColor(context, idColor));
+            }
+            if (main.tagstatus != null) {
+                main.tagstatus.setImageResource(icon);
+                main.tagstatus.setContentDescription(getString(description));
+            }
+        }
     }
 
     /**

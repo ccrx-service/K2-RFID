@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- NFC card frame, inspired by twotone_nfc_24.xml -->
+    <path android:fillColor="#ECEFF1" android:strokeColor="#546E7A" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M6,2.75H20.5L27.5,9.75V24.5C27.5,26.16 26.16,27.5 24.5,27.5H6C4.34,27.5 3,26.16 3,24.5V5.75C3,4.09 4.34,2.75 6,2.75Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#546E7A" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M20.5,3.1V9.7H27.1" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#546E7A" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M9,13.1C6.3,15.3 6.3,18.7 9,20.9" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#546E7A" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M12.7,10.8C8.1,14.2 8.1,19.8 12.7,23.2" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#546E7A" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M16.3,9.3C10.2,13.5 10.2,20.5 16.3,24.7" />
+    <path android:fillColor="#546E7A" android:pathData="M17.15,16A1.15,1.15 0,1 1,19.45 16A1.15,1.15 0,1 1,17.15 16Z" />
+    <!-- Blue-grey question badge -->
+    <path android:fillColor="#546E7A" android:strokeColor="#FFFFFF" android:strokeWidth="1.15" android:pathData="M30.75,24.35A6.35,6.35 0,1 1,18.05 24.35A6.35,6.35 0,1 1,30.75 24.35Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF" android:strokeWidth="1.55" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M21.9,21.8C22.15,20.3 23.1,19.55 24.45,19.55C25.9,19.55 26.85,20.35 26.85,21.6C26.85,22.55 26.2,23.1 25.35,23.65C24.75,24.05 24.5,24.45 24.5,25.1" />
+    <path android:fillColor="#ECEFF1" android:pathData="M23.7,27.05A0.7,0.7 0,1 1,25.1 27.05A0.7,0.7 0,1 1,23.7 27.05Z" />
+</vector>

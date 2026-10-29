@@ -10,4 +10,8 @@
     <color name="switch_thumb">#FAFAFA</color>
     <color name="background_main">#F4F4F4</color>
     <color name="background_alt">#FFFFFF</color>
+    <color name="nfc_status_data">#2E7D32</color>
+    <color name="nfc_status_unformatted">#757575</color>
+    <color name="nfc_status_non_material">#EF6C00</color>
+    <color name="nfc_status_unknown">#546E7A</color>
 </resources>

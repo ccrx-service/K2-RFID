@@ -373,6 +373,18 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/colorborder" />
 
+                <ImageView
+                    android:id="@+id/tagstatus"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/ic_nfc_status_unknown_24"
+                    android:contentDescription="@string/tag_status_unknown"
+                    app:layout_constraintStart_toEndOf="@+id/lbltagid"
+                    app:layout_constraintTop_toTopOf="@+id/tagid"
+                    app:layout_constraintBottom_toBottomOf="@+id/tagid"
+                />
+
                 <TextView
                     android:id="@+id/tagid"
                     android:layout_width="0dp"
@@ -385,7 +397,7 @@
                     android:textSize="18sp"
                     android:singleLine="true"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toEndOf="@+id/lbltagid"
+                    app:layout_constraintStart_toEndOf="@+id/tagstatus"
                     app:layout_constraintTop_toBottomOf="@+id/colorborder" />
 
                 <ImageView

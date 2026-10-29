@@ -240,4 +240,17 @@
     <string name="write_tag_lost">Tag lost. Keep your phone on the tag and try again.</string>
     <string name="retry">Retry</string>
     <string name="tag_weight_not_preset">The tag weight is not one of the available presets; the weight selection was not changed.</string>
+
+    <!-- NFC tag status and operation prompts -->
+    <string name="tag_status_data">Consumable data</string>
+    <string name="tag_status_unformatted">Unformatted tag</string>
+    <string name="tag_status_non_material">Non-consumable data</string>
+    <string name="tag_status_unknown">Unable to determine tag data</string>
+    <string name="read_wait_title">Waiting for NFC tag</string>
+    <string name="read_wait_msg">Hold your phone against the NFC tag you want to read. It will be read automatically.</string>
+    <string name="reading_tag_msg">Reading tag data. Keep your phone near the tag.</string>
+    <string name="read_failed_wait_msg">Reading failed. Hold your phone against the tag again, or cancel.</string>
+    <string name="write_failed_wait_msg">The write attempt could not finish. Hold your phone against the same tag again, or cancel.</string>
+    <string name="write_target_mismatch">This is not the original target tag. Please touch the original tag or cancel.</string>
+    <string name="operation_busy">Another NFC operation is in progress. Please finish or cancel it first.</string>
 </resources>

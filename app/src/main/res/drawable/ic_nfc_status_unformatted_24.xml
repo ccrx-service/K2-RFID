@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- NFC card frame, inspired by twotone_nfc_24.xml -->
+    <path android:fillColor="#F5F5F5" android:strokeColor="#757575" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M6,2.75H20.5L27.5,9.75V24.5C27.5,26.16 26.16,27.5 24.5,27.5H6C4.34,27.5 3,26.16 3,24.5V5.75C3,4.09 4.34,2.75 6,2.75Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#757575" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M20.5,3.1V9.7H27.1" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#757575" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M9,13.1C6.3,15.3 6.3,18.7 9,20.9" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#757575" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M12.7,10.8C8.1,14.2 8.1,19.8 12.7,23.2" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#757575" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M16.3,9.3C10.2,13.5 10.2,20.5 16.3,24.7" />
+    <path android:fillColor="#757575" android:pathData="M17.15,16A1.15,1.15 0,1 1,19.45 16A1.15,1.15 0,1 1,17.15 16Z" />
+    <!-- Grey empty badge -->
+    <path android:fillColor="#757575" android:strokeColor="#FFFFFF" android:strokeWidth="1.15" android:pathData="M30.75,24.35A6.35,6.35 0,1 1,18.05 24.35A6.35,6.35 0,1 1,30.75 24.35Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M21.05,24.35H27.75" />
+</vector>
