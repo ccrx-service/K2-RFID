@@ -32,10 +32,8 @@ android {
 
 dependencies {
     implementation libs.jsch
-    implementation libs.material
     implementation libs.constraintlayout.v214
     implementation libs.activity.v108
-    implementation libs.preference
     implementation libs.appcompat.v161
     implementation libs.room.runtime
     implementation libs.google.material

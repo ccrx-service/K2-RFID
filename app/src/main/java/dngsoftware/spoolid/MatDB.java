@@ -19,10 +19,6 @@ public interface MatDB {
    void updateItem(Filament item);
 
    @SuppressWarnings("UnusedDeclaration")
-   @Query("UPDATE filament_table SET filament_position =:pos WHERE filament_id =:filamentID")
-   void updatePosition(int pos, String filamentID);
-
-   @SuppressWarnings("UnusedDeclaration")
    @Delete
    void deleteItem(Filament item);
 
@@ -46,7 +42,4 @@ public interface MatDB {
    @Query("SELECT * FROM filament_table WHERE filament_id = :filamentID")
    Filament getFilamentById(String filamentID);
 
-   @SuppressWarnings("UnusedDeclaration")
-   @Query("SELECT * FROM filament_table WHERE filament_name = :filamentName")
-   Filament getFilamentByName(String filamentName);
 }

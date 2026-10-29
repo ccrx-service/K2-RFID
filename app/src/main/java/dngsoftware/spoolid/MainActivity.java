@@ -109,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     ColorMatcher matcher = null;
     private NfcAdapter nfcAdapter;
     Tag currentTag = null;
-    int SelectedBrand, SmSpoolID;
+    int SmSpoolID;
     String MaterialName, MaterialID, MaterialWeight, MaterialColor, PrinterType, MaterialVendor, SelectedPrinter;
     // MaterialVendor = selected brand (base.brand), MaterialType = selected base.meterialType.
     // loadedPrinter = printer whose database is currently open; used to ignore Spinner callbacks that only echo a programmatic selection.
@@ -147,7 +147,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private AlertDialog readDialog;
     private String pendingTargetTagId;
     private enum TagDataStatus { UNKNOWN, UNFORMATTED, NON_MATERIAL, MATERIAL_DATA }
-    private volatile TagDataStatus tagDataStatus = TagDataStatus.UNKNOWN;
     private Handler mainHandler;
     private ActivityResultLauncher<Intent> exportDirectoryChooser;
     private ActivityResultLauncher<Intent> importFileChooser;
@@ -324,7 +323,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
                 String brand = (String) parentView.getItemAtPosition(position);
                 if (brand == null || brand.equals(MaterialVendor)) return;
-                SelectedBrand = position;
                 MaterialVendor = brand;
                 loadTypes(brand, null, null); // new brand: old type, name and ID are dropped
             }
@@ -422,7 +420,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         MaterialType = null;
         MaterialName = null;
         MaterialID = null;
-        SelectedBrand = 0;
     }
 
     /** Write button: needs a valid current material ID and a valid weight before anything touches the tag. */
@@ -574,9 +571,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         if (addDialog != null && addDialog.isShowing()) {
             addDialog.dismiss();
         }
-        if (saveDialog != null && saveDialog.isShowing()) {
-            saveDialog.dismiss();
-        }
         if (tagDialog != null && tagDialog.isShowing()) {
             tagDialog.dismiss();
         }
@@ -654,23 +648,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
-    void CheckTag() {
-        if (currentTag != null) {
-            MifareClassic mfc = MifareClassic.get(currentTag);
-            if (mfc != null && mfc.getType() == MifareClassic.TYPE_CLASSIC) {
-                try {
-                    mfc.connect();
-                    encrypted = mfc.authenticateSectorWithKeyA(1, encKey);
-                    mfc.close();
-                } catch (Exception ignored) {
-                    showToast(R.string.error_reading_tag, Toast.LENGTH_SHORT);
-                    encrypted = false;
-                }
-            } else {
-                showToast(R.string.invalid_tag_type, Toast.LENGTH_SHORT);
-            }
-        }
-    }
 
     /** Opens the database of this printer (one Room database per printer) and reloads the selection lists, keeping the current selection if it still exists. */
     void setMatDb(String pType) {
@@ -711,7 +688,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 return;
             }
             int bi = Math.max(0, badapter.getPosition(wantBrand));
-            SelectedBrand = bi;
             MaterialVendor = brands[bi];
             main.brand.setSelection(bi);
             loadTypes(MaterialVendor, wantType, wantId);
@@ -1356,7 +1332,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     private void setTagStatus(TagDataStatus status) {
         if (status == null) status = TagDataStatus.UNKNOWN;
-        tagDataStatus = status;
         int icon;
         int description;
         int idColor;
@@ -3470,8 +3445,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             SettingsDialogBinding sdl = SettingsDialogBinding.inflate(getLayoutInflater());
             View rv = sdl.getRoot();
             settingsDialog.setContentView(rv);
-            sdl.readswitch.setChecked(GetSetting(context, "autoread", false));
-            sdl.readswitch.setOnCheckedChangeListener((buttonView, isChecked) -> SaveSetting(context, "autoread", isChecked));
             sdl.launchswitch.setChecked(GetSetting(context, "autoLaunch", true));
             sdl.launchswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 setNfcLaunchMode(context, isChecked);

@@ -8,7 +8,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.FeatureInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -105,21 +104,6 @@ public class Utils {
         return WeightCodec.lengthForGrams(WeightCodec.parseGrams(materialWeight));
     }
 
-    public static String GetMaterialWeight(String materialLength) {
-        switch (materialLength) {
-            case "0330":
-                return "1 KG";
-            case "0247":
-                return "750 G";
-            case "0198":
-                return "600 G";
-            case "0165":
-                return "500 G";
-            case "0082":
-                return "250 G";
-        }
-        return "1 KG";
-    }
 
     public static int GetMaterialIntWeight(String materialWeight) {
         int grams = WeightCodec.parseGrams(materialWeight);
@@ -274,11 +258,6 @@ public class Utils {
         return item.filamentParam;
     }
 
-    public static void setMaterialInfo(MatDB db, String materialId, String materialParam) {
-        Filament item = db.getFilamentById(materialId);
-        item.filamentParam = materialParam;
-        db.updateItem(item);
-    }
 
     public static String GetMaterialBrand(MatDB db, String materialId) {
         try {
@@ -344,14 +323,6 @@ public class Utils {
         return materialItems;
     }
 
-    public static List<MaterialItem> getMaterials(MatDB db, String brandName) {
-        List<Filament> items = db.getFilamentsByVendor(brandName);
-        List<MaterialItem> materialItems = new ArrayList<>();
-        for (int i = 0; i < items.size(); i++) {
-            materialItems.add(new MaterialItem(items.get(i).filamentName, items.get(i).filamentID));
-        }
-        return materialItems;
-    }
 
     public static int getMaterialPos(ArrayAdapter<MaterialItem> adapter, String materialID) {
         for (int i = 0; i < adapter.getCount(); i++) {
