@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     List<String> printerDb;
     ColorMatcher matcher = null;
     private NfcAdapter nfcAdapter;
-    Tag currentTag = null;
+    volatile Tag currentTag = null;
     int SmSpoolID;
     String MaterialName, MaterialID, MaterialWeight, MaterialColor, PrinterType, MaterialVendor, SelectedPrinter;
     // MaterialVendor = selected brand (base.brand), MaterialType = selected base.meterialType.
@@ -791,21 +791,31 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 return;
             }
         }
-        final Tag tag = currentTag;
         final long generation;
         synchronized (writeLock) {
             if (writeState != WRITE_IDLE || pendingWriteErrorRes != 0 || pendingTagData != null) return;
             writeState = WRITE_WAITING;
             pendingTagData = tagData;
-            pendingTargetTagId = tag == null ? null : bytesToHex(tag.getId());
+            // The target is chosen only by a fresh onTagDiscovered event after this click.
+            pendingTargetTagId = null;
+            currentTag = null;
             generation = ++writeGeneration;
         }
         tagStatusGeneration.incrementAndGet();
-        if (tag == null) {
-            showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
-        } else {
-            handleTagForWrite(tag);
-        }
+        clearWriteTargetDisplay(generation);
+        showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
+    }
+
+    /** Clear stale UI state only while this generation is still waiting for a fresh tag. */
+    private void clearWriteTargetDisplay(long generation) {
+        mainHandler.post(() -> {
+            synchronized (writeLock) {
+                if (generation != writeGeneration || writeState != WRITE_WAITING || pendingTargetTagId != null) return;
+            }
+            main.tagid.setText(R.string._00_00_00_00);
+            main.tagid.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            setTagStatus(TagDataStatus.UNKNOWN);
+        });
     }
 
     private void cancelPendingWrite(long generation) {
@@ -890,9 +900,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         synchronized (writeLock) {
             if (oldGeneration != writeGeneration || writeState != WRITE_IDLE || pendingTagData == null || pendingWriteErrorRes == 0) return;
             pendingWriteErrorRes = 0;
+            pendingTargetTagId = null;
+            currentTag = null;
             writeState = WRITE_WAITING;
             generation = ++writeGeneration;
         }
+        tagStatusGeneration.incrementAndGet();
+        clearWriteTargetDisplay(generation);
         showWriteDialog(R.string.write_wait_title, getString(R.string.write_wait_msg), false, 0, generation);
     }
 
@@ -947,11 +961,20 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         pendingTargetTagId = null;
                         pendingWriteErrorRes = 0;
                     } else if (waitAgain) {
+                        // The tag may have been removed or partially written. Do not pin the
+                        // waiting transaction to its old ID; a fresh discovery starts a full
+                        // write-and-verify attempt.
                         writeState = WRITE_WAITING;
+                        pendingTargetTagId = null;
                         pendingWriteErrorRes = 0;
+                        currentTag = null;
                     } else {
+                        // Keep the user-visible error and pending data for an explicit retry,
+                        // but never expose the failed Tag object as the current target.
                         writeState = WRITE_IDLE;
+                        pendingTargetTagId = null;
                         pendingWriteErrorRes = error;
+                        currentTag = null;
                     }
                 }
                 if (error == 0) {
@@ -966,8 +989,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     dismissWriteDialog(generation);
                     if (isInForeground) showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
                 } else if (waitAgain && isInForeground) {
-                    currentTag = null;
-                    mainHandler.post(() -> setTagStatus(TagDataStatus.UNKNOWN));
+                    tagStatusGeneration.incrementAndGet();
+                    clearWriteTargetDisplay(generation);
                     showWriteDialog(R.string.write_wait_title, getString(R.string.write_failed_wait_msg), false, 0, generation);
                 } else if (isInForeground) {
                     showWriteDialog(R.string.write_failed_title, getString(error), false, error, generation);
@@ -977,6 +1000,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             synchronized (writeLock) {
                 if (generation == writeGeneration && writeState == WRITE_RUNNING) {
                     writeState = WRITE_IDLE;
+                    pendingTargetTagId = null;
+                    currentTag = null;
                     pendingWriteErrorRes = R.string.error_writing_to_tag;
                 }
             }
