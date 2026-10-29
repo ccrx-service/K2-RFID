@@ -47,23 +47,6 @@ final class WeightCodec {
         return -1;
     }
 
-    /**
-     * Typing filter for the weight box. Returns the text that may be inserted at [dstart, dend) of dest:
-     * ASCII digits only, no leading zero, never more than 1000 in total. Deleting is always allowed.
-     */
-    static String acceptInsert(String dest, int dstart, int dend, String insert) {
-        if (insert == null || insert.isEmpty()) return "";
-        StringBuilder digits = new StringBuilder();
-        for (int i = 0; i < insert.length(); i++) {
-            char c = insert.charAt(i);
-            if (c < '0' || c > '9') return ""; // any non-digit (typed or pasted) rejects the whole insert
-            digits.append(c);
-        }
-        String candidate = dest.substring(0, dstart) + digits + dest.substring(dend);
-        if (candidate.length() > 4 || candidate.charAt(0) == '0' || Integer.parseInt(candidate) > MAX_GRAMS) return "";
-        return digits.toString();
-    }
-
     /** Canonical preset label ("1 KG", "750 G", ...) for a valid preset input, otherwise null. */
     static String presetLabel(String text) {
         if (text == null) return null;

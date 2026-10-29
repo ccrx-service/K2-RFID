@@ -25,7 +25,7 @@
     <string name="name">名称</string>
     <string name="weight">重量（g）</string>
     <string name="weight_hint">1-1000 g</string>
-    <string name="invalid_weight">重量无效。请选择预设值，或输入 1 到 1000 之间的整数克数。</string>
+    <string name="invalid_weight">重量无效。请选择列表中提供的预设重量。</string>
     <string name="select_material_first">尚未选择耗材</string>
     <string name="material_not_in_database">所选耗材不在打印机数据库中</string>
     <string name="invalid_material_id">耗材 ID 必须为 5 位</string>
@@ -240,4 +240,5 @@
     <string name="write_verify_failed">校验失败：回读数据与写入内容不一致。</string>
     <string name="write_tag_lost">标签连接中断，请保持手机贴近标签后重试。</string>
     <string name="retry">重试</string>
+    <string name="tag_weight_not_preset">标签中的重量不是当前提供的预设重量之一，未更改重量选择。</string>
 </resources>

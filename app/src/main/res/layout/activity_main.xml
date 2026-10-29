@@ -241,28 +241,13 @@
                     app:layout_constraintTop_toTopOf="@+id/materialborder" />
 
                 <!-- 5. 重量选择 -->
-                <AutoCompleteTextView
+                <Spinner
                     android:id="@+id/spoolsize"
                     android:layout_width="280dp"
                     android:layout_height="54dp"
                     android:layout_marginTop="22dp"
-                    android:background="@null"
-                    android:completionThreshold="0"
-                    android:dropDownHeight="wrap_content"
-                    android:hint="@string/weight_hint"
-                    android:importantForAutofill="no"
-                    android:inputType="none"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:cursorVisible="false"
-                    android:longClickable="false"
-                    android:maxLines="1"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="48dp"
-                    android:singleLine="true"
-                    android:textColor="@color/text_main"
-                    android:textColorHint="@color/text_main"
-                    android:textSize="18sp"
+                    android:spinnerMode="dialog"
+                    app:backgroundTint="@color/text_main"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/material" />

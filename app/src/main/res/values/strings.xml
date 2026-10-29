@@ -24,7 +24,7 @@
     <string name="name">Name</string>
     <string name="weight">Weight (g)</string>
     <string name="weight_hint">1-1000 g</string>
-    <string name="invalid_weight">Invalid weight. Pick a preset or enter a whole number of grams from 1 to 1000.</string>
+    <string name="invalid_weight">Invalid weight. Select one of the available preset weights.</string>
     <string name="select_material_first">No material selected</string>
     <string name="material_not_in_database">Selected material is not in the printer database</string>
     <string name="invalid_material_id">Material ID must be 5 characters</string>
@@ -239,4 +239,5 @@
     <string name="write_verify_failed">Verification failed: the data read back does not match.</string>
     <string name="write_tag_lost">Tag lost. Keep your phone on the tag and try again.</string>
     <string name="retry">Retry</string>
+    <string name="tag_weight_not_preset">The tag weight is not one of the available presets; the weight selection was not changed.</string>
 </resources>

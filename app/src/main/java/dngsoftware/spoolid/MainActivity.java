@@ -36,11 +36,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.SpannableString;
-import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -54,10 +52,8 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Filter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -113,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     ColorMatcher matcher = null;
     private NfcAdapter nfcAdapter;
     Tag currentTag = null;
-    int SelectedSize, SelectedBrand, SmSpoolID;
+    int SelectedBrand, SmSpoolID;
     String MaterialName, MaterialID, MaterialWeight, MaterialColor, PrinterType, MaterialVendor, SelectedPrinter;
     // MaterialVendor = selected brand (base.brand), MaterialType = selected base.meterialType.
     // loadedPrinter = printer whose database is currently open; used to ignore Spinner callbacks that only echo a programmatic selection.
@@ -309,7 +305,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
         main.writebutton.setOnClickListener(view -> WriteFromUi());
         setupMaterialSpinners();
-        setupWeightBox();
+        setupWeightSpinner();
     }
 
     /** Spinner listeners are installed once. Each level reloads the next one only when its selection really changed. */
@@ -356,61 +352,59 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         });
     }
 
-    /** Weight box: dropdown with the five presets, or type a whole number of grams (1-1000). Validated again before every write. */
-    private void setupWeightBox() {
-        sadapter = new ArrayAdapter<String>(context, R.layout.spinner_item, materialWeights) {
-            @NonNull
+    /**
+     * Weight Spinner: only predefined preset weights are selectable.
+     * MaterialWeight remains stored as a gram string.
+     */
+    private void setupWeightSpinner() {
+        sadapter = new ArrayAdapter<>(
+                context, R.layout.spinner_item, materialWeights);
+        main.spoolsize.setAdapter(sadapter);
+        main.spoolsize.setOnItemSelectedListener(
+                new AdapterView.OnItemSelectedListener() {
             @Override
-            public Filter getFilter() { // always list every preset, whatever is typed
-                return new Filter() {
-                    @Override
-                    protected FilterResults performFiltering(CharSequence constraint) {
-                        FilterResults r = new FilterResults();
-                        r.values = materialWeights;
-                        r.count = materialWeights.length;
-                        return r;
-                    }
-
-                    @Override
-                    protected void publishResults(CharSequence constraint, FilterResults results) {
-                        notifyDataSetChanged();
-                    }
-                };
-            }
-        };
-        AutoCompleteTextView box = main.spoolsize;
-        box.setAdapter(sadapter);
-        box.setDropDownBackgroundResource(R.color.background_alt);
-        // digits only (grams), no leading zero, at most 1000; presets are shown as their gram value
-        box.setFilters(new InputFilter[]{(source, start, end, dest, dstart, dend) ->
-                WeightCodec.acceptInsert(dest.toString(), dstart, dend, source.subSequence(start, end).toString())});
-        setWeightText(materialWeights[SelectedSize]);
-        box.setOnItemClickListener((parent, view, position, id) -> setWeightText(sadapter.getItem(position)));
-        box.setOnClickListener(v -> box.showDropDown());
-        box.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            public void onItemSelected(
+                    AdapterView<?> parentView,
+                    View selectedItemView,
+                    int position,
+                    long id) {
+                Object item = parentView.getItemAtPosition(position);
+                String value = item == null ? null : item.toString();
+                String preset = WeightCodec.presetLabel(value);
+                int grams = WeightCodec.parseGrams(preset);
+                MaterialWeight = grams > 0 ? String.valueOf(grams) : null;
             }
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                MaterialWeight = s.toString();
+            public void onNothingSelected(AdapterView<?> parentView) {
+                MaterialWeight = null;
             }
         });
+
+        if (sadapter.getCount() > 0) {
+            main.spoolsize.setSelection(0);
+            selectWeightPreset(sadapter.getItem(0));
+        } else {
+            MaterialWeight = null;
+        }
     }
 
-    /** Shows a preset label ("1 KG", "750 G", ...) or a gram value in the weight box as plain grams. */
-    void setWeightText(String weight) {
-        int grams = WeightCodec.parseGrams(weight);
-        if (grams < 0) return;
-        String text = String.valueOf(grams);
-        main.spoolsize.setText(text, false);
-        main.spoolsize.setSelection(text.length());
-        MaterialWeight = text;
+    /**
+     * Select a supported preset. Custom values are never silently replaced.
+     */
+    private boolean selectWeightPreset(String weight) {
+        if (sadapter == null || weight == null) return false;
+
+        String preset = WeightCodec.presetLabel(weight);
+        if (preset == null) return false;
+
+        int position = sadapter.getPosition(preset);
+        int grams = WeightCodec.parseGrams(preset);
+        if (position < 0 || grams <= 0) return false;
+
+        main.spoolsize.setSelection(position);
+        MaterialWeight = String.valueOf(grams);
+        return true;
     }
 
     /** Clears brand, type, name and ID (and their lists) so nothing stale can be written. */
@@ -441,13 +435,30 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             showToast(R.string.invalid_material_id, Toast.LENGTH_SHORT);
             return;
         }
-        String weightText = main.spoolsize.getText().toString();
+        Object selectedWeight = main.spoolsize.getSelectedItem();
+        if (!(selectedWeight instanceof String)) {
+            showToast(R.string.invalid_weight, Toast.LENGTH_LONG);
+            return;
+        }
+
+        String weightText = (String) selectedWeight;
+        if (WeightCodec.presetLabel(weightText) == null) {
+            showToast(R.string.invalid_weight, Toast.LENGTH_LONG);
+            return;
+        }
+
         String length = GetMaterialLength(weightText);
         if (length == null) {
             showToast(R.string.invalid_weight, Toast.LENGTH_LONG);
             return;
         }
-        MaterialWeight = weightText;
+
+        int grams = WeightCodec.parseGrams(weightText);
+        if (grams <= 0) {
+            showToast(R.string.invalid_weight, Toast.LENGTH_LONG);
+            return;
+        }
+        MaterialWeight = String.valueOf(grams);
         WriteSpoolData(MaterialID, MaterialColor, length);
     }
 
@@ -1099,17 +1110,21 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             main.txtcolor.setTextColor(getContrastColor(color));
 
             String weight = WeightCodec.labelForLength(tagLength);
-            if (weight != null) {
-                setWeightText(weight);
-            } else {
-                showToast(R.string.tag_weight_out_of_range, Toast.LENGTH_SHORT);
-            }
+            boolean tagWeightOutOfRange = weight == null;
+            boolean weightPresetSelected =
+                    weight != null && selectWeightPreset(weight);
 
             MaterialVendor = record.filamentVendor;
             MaterialType = getMaterialType(record);
             MaterialID = tagMaterialId;
             populateMaterialSpinners(MaterialVendor, MaterialType, tagMaterialId);
-            showToast(R.string.data_read_from_tag, Toast.LENGTH_SHORT);
+            if (tagWeightOutOfRange) {
+                showToast(R.string.tag_weight_out_of_range, Toast.LENGTH_SHORT);
+            } else if (!weightPresetSelected) {
+                showToast(R.string.tag_weight_not_preset, Toast.LENGTH_SHORT);
+            } else {
+                showToast(R.string.data_read_from_tag, Toast.LENGTH_SHORT);
+            }
         } catch (Exception ignored) {
             showToast(R.string.error_reading_tag, Toast.LENGTH_SHORT);
         }
